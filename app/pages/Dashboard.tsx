@@ -1,12 +1,12 @@
 import AdminLayout from "../layouts/AdminLayout";
-import { FaUsers, FaDollarSign, FaShoppingCart, FaUndo } from "react-icons/fa";
+import { FaUsers, FaDollarSign, FaShoppingCart, FaUndo, FaStore } from "react-icons/fa";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 const stats = [
   { title: "Total Customers", value: "567,899", icon: <FaUsers className="text-blue-500" />, trend: "+2.5%", trendUp: true },
   { title: "Total Revenue", value: "₱3,465,000", icon: <span className="text-green-500 text-xl font-bold">₱</span>, trend: "+0.5%", trendUp: true },
   { title: "Total Orders", value: "1,136,000", icon: <FaShoppingCart className="text-purple-500" />, trend: "-0.2%", trendUp: false },
-  { title: "Total Returns", value: "1,789", icon: <FaUndo className="text-red-500" />, trend: "+0.12%", trendUp: true },
+  { title: "Total Franchisee", value: "1,789", icon: <FaStore className="text-red-500" />, trend: "+0.12%", trendUp: true },
 ];
 
 const barData = [
