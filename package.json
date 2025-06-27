@@ -11,10 +11,18 @@
   "dependencies": {
     "@react-router/node": "^7.5.3",
     "@react-router/serve": "^7.5.3",
+    "@supabase/supabase-js": "^2.50.2",
     "isbot": "^5.1.27",
+    "jspdf": "^3.0.1",
+    "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.523.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^7.5.3"
+    "react-icons": "^5.5.0",
+    "react-router": "^7.5.3",
+    "react-router-dom": "^7.6.2",
+    "recharts": "^3.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@react-router/dev": "^7.5.3",
