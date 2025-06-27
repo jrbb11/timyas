@@ -75,13 +75,20 @@ const AllSales = () => {
   const handleDelete = async () => {
     if (!saleToDelete) return;
     setLoadingAction(true);
-    // TODO: Implement delete logic for sales
-    setTimeout(() => {
-      setToast({ message: 'Sale deleted (stub)', type: 'success' });
-      setShowDeleteConfirm(false);
-      setSaleToDelete(null);
-      setLoadingAction(false);
-    }, 1000);
+    // Update the sale's status to 'cancel'
+    const { error } = await salesService.update(saleToDelete.id, { status: 'cancel' });
+    if (error) {
+      setToast({ message: error.message, type: 'error' });
+    } else {
+      setToast({ message: 'Sale cancelled', type: 'success' });
+      // Refresh the sales list
+      salesService.getView().then(({ data, error }) => {
+        if (!error) setSales(data || []);
+      });
+    }
+    setShowDeleteConfirm(false);
+    setSaleToDelete(null);
+    setLoadingAction(false);
   };
 
   // Toast auto-dismiss
@@ -147,7 +154,13 @@ const AllSales = () => {
                     <td className="p-3">{sale.invoice_number}</td>
                     <td className="p-3">{sale.customer_name}</td>
                     <td className="p-3">{sale.warehouse_name}</td>
-                    <td className="p-3"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{sale.status}</span></td>
+                    <td className="p-3">
+                      {sale.status === 'cancel' ? (
+                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">cancelled</span>
+                      ) : (
+                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{sale.status}</span>
+                      )}
+                    </td>
                     <td className="p-3">{Number(sale.total_amount).toLocaleString()}</td>
                     <td className="p-3">{Number(sale.paid || 0).toLocaleString()}</td>
                     <td className="p-3">{Number(sale.due || 0).toLocaleString()}</td>
