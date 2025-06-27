@@ -1,7 +1,7 @@
 import AdminLayout from '../layouts/AdminLayout';
 import { useEffect, useState } from 'react';
 import { salesService } from '../services/salesService';
-import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaTimesCircle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 
@@ -185,10 +185,10 @@ const AllSales = () => {
                         <button
                           className="text-red-600 hover:text-red-800"
                           onClick={() => { setSaleToDelete(sale); setShowDeleteConfirm(true); }}
-                          title="Delete"
+                          title="Cancel"
                           disabled={loadingAction}
                         >
-                          <FaTrash />
+                          <FaTimesCircle />
                         </button>
                       </div>
                     </td>
@@ -215,7 +215,7 @@ const AllSales = () => {
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => { setShowDeleteConfirm(false); setSaleToDelete(null); }}
-        title="Delete Sale"
+        title="Cancel Sale"
         footer={
           <div className="flex justify-end gap-2">
             <button
@@ -223,19 +223,19 @@ const AllSales = () => {
               onClick={() => { setShowDeleteConfirm(false); setSaleToDelete(null); }}
               disabled={loadingAction}
             >
-              Cancel
+              Back
             </button>
             <button
               className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
               onClick={handleDelete}
               disabled={loadingAction}
             >
-              {loadingAction ? 'Deleting...' : 'Delete'}
+              {loadingAction ? 'Cancelling...' : 'Cancel Sale'}
             </button>
           </div>
         }
       >
-        <p>Are you sure you want to delete this sale?</p>
+        <p>Are you sure you want to cancel this sale?</p>
         <p className="font-semibold mt-2">{saleToDelete?.reference}</p>
       </Modal>
       {toast && (
