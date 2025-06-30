@@ -201,6 +201,10 @@ create table public.accounts (
     product_code text null,
     cost numeric(10, 2) not null default 0.00,
     qty integer not null default 1,
+<<<<<<< HEAD
+=======
+    kilos numeric null,
+>>>>>>> 1eb112a (Update project: add kilos column and other changes)
     discount numeric(10, 2) not null default 0.00,
     tax numeric(10, 2) not null default 0.00,
     subtotal numeric GENERATED ALWAYS as ((((cost * (qty)::numeric) - discount) + tax)) STORED (12, 2) null,
