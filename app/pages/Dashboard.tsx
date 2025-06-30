@@ -1,13 +1,8 @@
 import AdminLayout from "../layouts/AdminLayout";
-import { FaUsers, FaDollarSign, FaShoppingCart, FaUndo, FaStore } from "react-icons/fa";
+import { useEffect, useState } from "react";
+import { FaShoppingCart, FaDollarSign, FaStore } from "react-icons/fa";
+import { purchasesService } from "../services/purchasesService";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-
-const stats = [
-  { title: "Total Customers", value: "567,899", icon: <FaUsers className="text-blue-500" />, trend: "+2.5%", trendUp: true },
-  { title: "Total Revenue", value: "₱3,465,000", icon: <span className="text-green-500 text-xl font-bold">₱</span>, trend: "+0.5%", trendUp: true },
-  { title: "Total Orders", value: "1,136,000", icon: <FaShoppingCart className="text-purple-500" />, trend: "-0.2%", trendUp: false },
-  { title: "Total Franchisee", value: "1,789", icon: <FaStore className="text-red-500" />, trend: "+0.12%", trendUp: true },
-];
 
 const barData = [
   { date: "1 Jul", margin: 20000, revenue: 40000 },
@@ -49,6 +44,26 @@ const customerSales = [
 ];
 
 const Dashboard = () => {
+  const [totalPurchaseAmount, setTotalPurchaseAmount] = useState(0);
+
+  useEffect(() => {
+    purchasesService.getAll().then(({ data }) => {
+      if (data) {
+        const sum = data.reduce((acc, curr) => acc + (Number(curr.total_amount) || 0), 0);
+        setTotalPurchaseAmount(sum);
+      } else {
+        setTotalPurchaseAmount(0);
+      }
+    });
+  }, []);
+
+  const stats = [
+    { title: "Total Purchase Amount", value: `₱${totalPurchaseAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, icon: <span className="text-green-500 text-xl font-bold">₱</span>, trend: "", trendUp: true },
+    { title: "Total Revenue", value: "₱3,465,000", icon: <span className="text-green-500 text-xl font-bold">₱</span>, trend: "+0.5%", trendUp: true },
+    { title: "Total Orders", value: "1,136,000", icon: <FaShoppingCart className="text-purple-500" />, trend: "-0.2%", trendUp: false },
+    { title: "Total Franchisee", value: "1,789", icon: <FaStore className="text-red-500" />, trend: "+0.12%", trendUp: true },
+  ];
+
   return (
     <AdminLayout title="Dashboard">
       <div className="space-y-6">
@@ -58,7 +73,7 @@ const Dashboard = () => {
             <div key={title} className="bg-white shadow rounded-lg p-4 flex flex-col gap-2">
               <div className="flex items-center gap-2 text-sm text-gray-500">{icon} {title}</div>
               <div className="text-2xl font-bold mt-1">{value}</div>
-              <div className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-500' : 'text-red-500'}`}>{trendUp ? '▲' : '▼'} {trend}</div>
+              {trend && <div className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-500' : 'text-red-500'}`}>{trendUp ? '▲' : '▼'} {trend}</div>}
             </div>
           ))}
         </div>
