@@ -10,14 +10,11 @@ export default [
   route("products/brand", "pages/Brand.tsx"),
   route("products/unit", "pages/Unit.tsx"),
   route("products/count-stock", "pages/CountStock.tsx"),
-<<<<<<< HEAD
-=======
   route("products/stock-adjustments", "pages/AllStockAdjustments.tsx"),
   route("products/stock-adjustments/create", "pages/CreateStockAdjustment.tsx"),
   route("products/stock-adjustments/edit/:id", "pages/EditStockAdjustment.tsx"),
   route("products/stock-adjustments/view/:id", "pages/StockAdjustmentView.tsx"),
   route("products/stock-movement-history", "pages/StockMovementHistory.tsx"),
->>>>>>> 1eb112a (Update project: add kilos column and other changes)
   route("sales/create", "pages/CreateSale.tsx"),
   route("sales/all", "pages/AllSales.tsx"),
   route("sales/shipments", "pages/Shipments.tsx"),
