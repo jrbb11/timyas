@@ -39,6 +39,12 @@ const CreateStockAdjustment = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Add state for marination cost
+  const [marinationCost, setMarinationCost] = useState(15);
+
+  // Add state for marination quantity
+  const [marinationQty, setMarinationQty] = useState(1);
+
   // Set initial date after mount to avoid hydration mismatch
   useEffect(() => {
     if (!date) {
@@ -103,6 +109,26 @@ const CreateStockAdjustment = () => {
     : [];
 
   const handleSelectProduct = (product: any) => {
+    if (reason === 'Production/Marination' && product.name?.toLowerCase() === 'chicken') {
+      if (adjustmentItems.some(item => item.name?.toLowerCase() === 'chicken' && item.type === 'subtraction')) return;
+      const currentStock = currentStocks[product.id] || 0;
+      const subItem = {
+        ...product,
+        type: 'subtraction',
+        quantity: marinationQty,
+        before_stock: currentStock,
+        after_stock: currentStock - marinationQty,
+      };
+      setAdjustmentItems([subItem]);
+      setProductSearch('');
+      setShowProductDropdown(false);
+      searchInputRef.current?.focus();
+      return;
+    }
+    if (reason === 'Production/Marination' && product.name?.toLowerCase().includes('marinated')) {
+      alert('Marinated Chicken will be added automatically when you select Chicken for marination.');
+      return;
+    }
     const currentStock = currentStocks[product.id] || 0;
     const newItem = {
       ...product,
@@ -116,6 +142,17 @@ const CreateStockAdjustment = () => {
     setShowProductDropdown(false);
     searchInputRef.current?.focus();
   };
+
+  // Sync marinationQty to both items
+  useEffect(() => {
+    if (reason === 'Production/Marination' && adjustmentItems.length === 2) {
+      const [subItem, addItem] = adjustmentItems;
+      const newSub = { ...subItem, quantity: marinationQty, after_stock: subItem.before_stock - marinationQty };
+      const newAdd = { ...addItem, quantity: marinationQty, after_stock: addItem.before_stock + marinationQty };
+      setAdjustmentItems([newSub, newAdd]);
+    }
+    // eslint-disable-next-line
+  }, [marinationQty]);
 
   const handleRemoveItem = (index: number) => {
     setAdjustmentItems(adjustmentItems.filter((_, i) => i !== index));
@@ -153,45 +190,16 @@ const CreateStockAdjustment = () => {
       setError('Please add at least one product to adjust');
       return;
     }
-
     if (!selectedWarehouse || selectedWarehouse.trim() === '') {
       setError('Please select a warehouse');
       return;
     }
-
     setLoading(true);
     setError(null);
     setSuccess(null);
     try {
-      if (isEdit) {
-        // Update adjustment batch
-        const batchData = {
-          reference_code: reference,
-          reason,
-          warehouse: selectedWarehouse,
-          adjusted_at: date,
-        };
-        await adjustmentBatchesService.update(id as string, batchData);
-        
-        // Remove old items and insert new
-        const { data: oldItems } = await productAdjustmentsService.getByBatchId(id as string);
-        if (oldItems && oldItems.length > 0) {
-          for (const item of oldItems) {
-            await productAdjustmentsService.remove(item.id);
-          }
-        }
-        
-        const items = adjustmentItems.map(item => ({
-          adjustment_batch_id: id,
-          product_id: item.id,
-          type: item.type,
-          quantity: item.quantity,
-          before_stock: item.before_stock,
-          after_stock: item.after_stock,
-        }));
-        await productAdjustmentsService.createMany(items);
-        setSuccess('Stock adjustment updated successfully!');
-      } else {
+      let batchId = id;
+      if (!isEdit) {
         // Create adjustment batch
         const batchData = {
           reference_code: reference,
@@ -201,14 +209,67 @@ const CreateStockAdjustment = () => {
         };
         const { data: batchRes, error: batchError } = await adjustmentBatchesService.create(batchData);
         if (batchError || !batchRes || !(batchRes as any[])[0]?.id) {
-          console.error('Batch creation error:', batchError);
-          console.error('Batch response:', batchRes);
           setError(batchError?.message || batchError?.details || 'Failed to create adjustment batch');
           setLoading(false);
           return;
         }
-        
-        const batchId = (batchRes as any[])[0].id;
+        batchId = (batchRes as any[])[0].id;
+      } else {
+        // Update adjustment batch
+        const batchData = {
+          reference_code: reference,
+          reason,
+          warehouse: selectedWarehouse,
+          adjusted_at: date,
+        };
+        await adjustmentBatchesService.update(id as string, batchData);
+      }
+      // For marination, add marinated chicken addition automatically
+      if (reason === 'Production/Marination') {
+        const subItem = adjustmentItems[0];
+        // Find marinated chicken product
+        const marinatedChicken = products.find(p => p.name?.toLowerCase().includes('marinated'));
+        if (!marinatedChicken) {
+          setError('Marinated Chicken product not found. Please create it first.');
+          setLoading(false);
+          return;
+        }
+        // Get raw chicken cost
+        const rawCost = subItem.product_cost || 0;
+        const newCost = rawCost + marinationCost;
+        // Create both adjustments
+        const items = [
+          {
+            adjustment_batch_id: batchId,
+            product_id: subItem.id,
+            type: 'subtraction',
+            quantity: subItem.quantity,
+            before_stock: subItem.before_stock,
+            after_stock: subItem.after_stock,
+          },
+          {
+            adjustment_batch_id: batchId,
+            product_id: marinatedChicken.id,
+            type: 'addition',
+            quantity: subItem.quantity,
+            before_stock: currentStocks[marinatedChicken.id] || 0,
+            after_stock: (currentStocks[marinatedChicken.id] || 0) + subItem.quantity,
+          },
+        ];
+        // Debug log
+        console.log('Inserting product_adjustments:', items);
+        const { error: adjError, data: adjData } = await productAdjustmentsService.createMany(items);
+        if (adjError) {
+          setError('Failed to insert adjustment items: ' + adjError.message);
+          setLoading(false);
+          return;
+        }
+        console.log('Inserted product_adjustments:', adjData);
+        // Update marinated chicken cost
+        await productsService.update(marinatedChicken.id, { product_cost: newCost });
+        setSuccess('Stock adjustment created successfully!');
+      } else {
+        // Default: create adjustments as usual
         const items = adjustmentItems.map(item => ({
           adjustment_batch_id: batchId,
           product_id: item.id,
@@ -296,13 +357,25 @@ const CreateStockAdjustment = () => {
 
           <div>
             <label className="block text-sm font-medium mb-1">Reason</label>
-            <textarea
-              className="w-full border rounded px-3 py-2"
-              rows={3}
+            <select
+              className="w-full border rounded px-3 py-2 mb-2"
               value={reason}
               onChange={e => setReason(e.target.value)}
-              placeholder="Enter reason for stock adjustment..."
-            />
+            >
+              <option value="">Select reason...</option>
+              <option value="Stock Adjustment">Stock Adjustment</option>
+              <option value="Production/Marination">Production/Marination</option>
+              <option value="Other">Other</option>
+            </select>
+            {reason === 'Other' && (
+              <textarea
+                className="w-full border rounded px-3 py-2 mt-2"
+                rows={3}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Enter reason for stock adjustment..."
+              />
+            )}
           </div>
 
           <div className="relative">
@@ -334,6 +407,19 @@ const CreateStockAdjustment = () => {
               </ul>
             )}
           </div>
+
+          {reason === 'Production/Marination' && adjustmentItems.length === 2 && (
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Number of Chickens to Marinate</label>
+              <input
+                type="number"
+                min="1"
+                className="w-32 border rounded px-3 py-2"
+                value={marinationQty}
+                onChange={e => setMarinationQty(Number(e.target.value))}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Adjustment Items *</label>
@@ -369,16 +455,16 @@ const CreateStockAdjustment = () => {
                           </span>
                         </td>
                         <td className="p-2">
-                          <span className={`inline-block text-xs px-2 py-0.5 rounded ${
-                            item.type === 'addition' 
-                              ? 'bg-green-100 text-green-700' 
-                              : 'bg-red-100 text-red-700'
-                          }`}>
-                            {item.type === 'addition' ? 'Addition' : 'Subtraction'}
-                          </span>
+                          {reason === 'Production/Marination' && (item.name?.toLowerCase() === 'chicken' || item.name?.toLowerCase().includes('marinated'))
+                            ? <span className="font-bold text-lg">{item.quantity}</span>
+                            : <span className="font-bold text-lg">{item.quantity}</span>
+                          }
                         </td>
                         <td className="p-2">
-                          <span className="font-bold text-lg">{item.quantity}</span>
+                          {reason === 'Production/Marination' && (item.name?.toLowerCase() === 'chicken' || item.name?.toLowerCase().includes('marinated'))
+                            ? <span className={`inline-block text-xs px-2 py-0.5 rounded ${item.type === 'addition' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.type === 'addition' ? 'Addition' : 'Subtraction'}</span>
+                            : <span className={`inline-block text-xs px-2 py-0.5 rounded ${item.type === 'addition' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.type === 'addition' ? 'Addition' : 'Subtraction'}</span>
+                          }
                         </td>
                         <td className="p-2">
                           <span className={`inline-block text-xs px-2 py-0.5 rounded ${
@@ -406,6 +492,19 @@ const CreateStockAdjustment = () => {
                               <FaTrash size={14} />
                             </button>
                           </div>
+                          {/* Marination cost field for marinated chicken addition */}
+                          {reason === 'Production/Marination' && item.type === 'addition' && item.name?.toLowerCase().includes('marinated') && (
+                            <div className="mt-2">
+                              <label className="block text-xs font-medium mb-1">Additional Cost per Chicken (₱)</label>
+                              <input
+                                type="number"
+                                min="0"
+                                className="w-24 border rounded px-2 py-1"
+                                value={marinationCost}
+                                onChange={e => setMarinationCost(Number(e.target.value))}
+                              />
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))
