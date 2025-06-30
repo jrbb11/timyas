@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-<<<<<<< HEAD
-import { FaChartBar, FaShoppingCart, FaUsers, FaCog, FaTags, FaMoneyBill, FaFileInvoice, FaSun, FaMoon, FaSignOutAlt, FaCreditCard, FaPlus, FaList, FaPrint, FaBoxes, FaThList, FaTrademark, FaBalanceScale, FaFile } from 'react-icons/fa';
-=======
 import { FaChartBar, FaShoppingCart, FaUsers, FaCog, FaTags, FaMoneyBill, FaFileInvoice, FaSun, FaMoon, FaSignOutAlt, FaCreditCard, FaPlus, FaList, FaPrint, FaBoxes, FaThList, FaTrademark, FaBalanceScale, FaFile, FaExchangeAlt, FaHistory } from 'react-icons/fa';
->>>>>>> 1eb112a (Update project: add kilos column and other changes)
 
 export const Sidebar = () => {
   const [productsOpen, setProductsOpen] = useState(false);
@@ -46,8 +42,6 @@ export const Sidebar = () => {
                   <a href="/products/count-stock" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaBoxes /> Count Stock
                   </a>
-<<<<<<< HEAD
-=======
                   <a href="/products/stock-adjustments/create" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaExchangeAlt /> Create Stock Adjustment
                   </a>
@@ -57,7 +51,6 @@ export const Sidebar = () => {
                   <a href="/products/stock-movement-history" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaHistory /> Stock Movement History
                   </a>
->>>>>>> 1eb112a (Update project: add kilos column and other changes)
                   <a href="/products/category" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaThList /> Category
                   </a>
