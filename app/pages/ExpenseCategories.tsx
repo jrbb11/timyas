@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 
-const mockCategories = [
-  { id: 1, name: 'Office' },
-  { id: 2, name: 'Utilities' },
-];
-
 const ExpenseCategories = () => {
-  const [categories, setCategories] = useState(mockCategories);
+  const [categories, setCategories] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editCategory, setEditCategory] = useState(null);
@@ -76,17 +71,22 @@ const ExpenseCategories = () => {
       </div>
       {/* Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white rounded shadow-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">{editCategory ? 'Edit' : 'Create'} Category</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+            <h2 className="text-2xl font-bold mb-6">{editCategory ? 'Edit' : 'Create'} Category</h2>
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block mb-1">Name</label>
-                <input name="name" value={form.name} onChange={handleChange} className="w-full border rounded p-2" required />
+                <label className="block mb-1 font-medium text-gray-700">Name</label>
+                <input name="name" value={form.name} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
               </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" className="px-4 py-2 rounded border" onClick={closeModal}>Cancel</button>
-                <button type="submit" className="bg-primary text-white px-4 py-2 rounded">{editCategory ? 'Update' : 'Create'}</button>
+              <div className="flex items-center justify-between pt-4 gap-2">
+                {editCategory && (
+                  <button type="button" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-100" onClick={() => handleDelete(editCategory.id)}>Delete</button>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={closeModal}>Cancel</button>
+                  <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2">{editCategory ? 'Save changes' : 'Add category'}</button>
+                </div>
               </div>
             </form>
           </div>

@@ -360,115 +360,121 @@ const Customers = () => {
           </div>
         </Modal>
         {/* Create Customer Modal */}
-        <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create Customer">
-          <form onSubmit={handleCreateSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
-              <input name="name" value={createForm.name} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input name="email" type="email" value={createForm.email} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Phone</label>
-              <input name="phone" value={createForm.phone} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Address</label>
-              <input name="address" value={createForm.address} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">City</label>
-                <input name="city" value={createForm.city} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Country</label>
-                <input name="country" value={createForm.country} onChange={handleCreateChange} className="border rounded px-3 py-2 w-full" />
-              </div>
-            </div>
-            {createError && <div className="text-red-600 text-sm">{createError}</div>}
-            <div className="flex gap-2 mt-4">
-              <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" disabled={createLoading}>{createLoading ? 'Saving...' : 'Save'}</button>
-              <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200" onClick={() => setShowCreateModal(false)} disabled={createLoading}>Cancel</button>
-            </div>
-          </form>
-        </Modal>
-        {/* Edit Customer Modal */}
-        <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Customer">
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Name</label>
-              <input name="name" value={editForm.name} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" required />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input name="email" type="email" value={editForm.email} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Phone</label>
-              <input name="phone" value={editForm.phone} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Address</label>
-              <input name="address" value={editForm.address} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" />
-            </div>
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">City</label>
-                <input name="city" value={editForm.city} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" />
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Country</label>
-                <input name="country" value={editForm.country} onChange={handleEditChange} className="border rounded px-3 py-2 w-full" />
-              </div>
-            </div>
-            {editError && <div className="text-red-600 text-sm">{editError}</div>}
-            <div className="flex gap-2 mt-4">
-              <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" disabled={editLoading}>{editLoading ? 'Saving...' : 'Save'}</button>
-              <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200" onClick={() => setShowEditModal(false)} disabled={editLoading}>Cancel</button>
-            </div>
-            {/* Audit log display */}
-            <div className="mb-4">
-              <h3 className="font-semibold mb-1">Change History</h3>
-              {loadingAudit ? (
-                <div className="text-gray-500">Loading history...</div>
-              ) : auditError ? (
-                <div className="text-red-500">{auditError}</div>
-              ) : auditLogs.length === 0 ? (
-                <div className="text-gray-400">No changes yet.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-xs border">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        <th className="p-2 text-left">When</th>
-                        <th className="p-2 text-left">Who</th>
-                        <th className="p-2 text-left">Changes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditLogs.map((log, idx) => (
-                        <tr key={log.id || idx} className="border-t">
-                          <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
-                          <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
-                          <td className="p-2">
-                            <ul className="list-disc ml-4">
-                              {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
-                                <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
-                              ))}
-                            </ul>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+        {showCreateModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+              <h2 className="text-2xl font-bold mb-6">Create Customer</h2>
+              <form onSubmit={handleCreateSubmit} className="space-y-5">
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Name</label>
+                  <input name="name" value={createForm.name} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
                 </div>
-              )}
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Email</label>
+                  <input name="email" value={createForm.email} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" type="email" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Phone</label>
+                  <input name="phone" value={createForm.phone} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Address</label>
+                  <input name="address" value={createForm.address} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">City</label>
+                  <input name="city" value={createForm.city} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Country</label>
+                  <input name="country" value={createForm.country} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div className="flex gap-2 justify-end pt-4">
+                  <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={() => setShowCreateModal(false)} disabled={createLoading}>Cancel</button>
+                  <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2" disabled={createLoading}>{createLoading ? 'Saving...' : 'Save Customer'}</button>
+                </div>
+                {createError && <div className="text-red-600 text-sm mt-2">{createError}</div>}
+              </form>
             </div>
-          </form>
-        </Modal>
+          </div>
+        )}
+        {/* Edit Customer Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+              <h2 className="text-2xl font-bold mb-6">Edit Customer</h2>
+              <form onSubmit={handleEditSubmit} className="space-y-5">
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Name</label>
+                  <input name="name" value={editForm.name} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Email</label>
+                  <input name="email" type="email" value={editForm.email} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Phone</label>
+                  <input name="phone" value={editForm.phone} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Address</label>
+                  <input name="address" value={editForm.address} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">City</label>
+                  <input name="city" value={editForm.city} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Country</label>
+                  <input name="country" value={editForm.country} onChange={handleEditChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                {editError && <div className="text-red-600 text-sm mt-2">{editError}</div>}
+                <div className="flex gap-2 justify-end pt-4">
+                  <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={() => setShowEditModal(false)} disabled={editLoading}>Cancel</button>
+                  <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2" disabled={editLoading}>{editLoading ? 'Saving...' : 'Save Changes'}</button>
+                </div>
+              </form>
+              {/* Audit log display */}
+              <div className="mt-8">
+                <h3 className="font-semibold mb-1">Change History</h3>
+                {loadingAudit ? (
+                  <div className="text-gray-500">Loading history...</div>
+                ) : auditError ? (
+                  <div className="text-red-500">{auditError}</div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="text-gray-400">No changes yet.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs border">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="p-2 text-left">When</th>
+                          <th className="p-2 text-left">Who</th>
+                          <th className="p-2 text-left">Changes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {auditLogs.map((log, idx) => (
+                          <tr key={log.id || idx} className="border-t">
+                            <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                            <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
+                            <td className="p-2">
+                              <ul className="list-disc ml-4">
+                                {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
+                                  <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
+                                ))}
+                              </ul>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {/* Toast Notification */}
         {toast && (
           <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>

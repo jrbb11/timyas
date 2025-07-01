@@ -1,25 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-
-const mockTransfers = [
-  { id: 1, from: 'Cash', to: 'Bank', amount: 200, date: '2024-07-01', description: 'Transfer to bank' },
-  { id: 2, from: 'Bank', to: 'Credit Card', amount: 100, date: '2024-07-02', description: 'Pay credit card' },
-];
-
-const mockAccounts = ['Cash', 'Bank', 'Credit Card'];
+import { accountsService } from '../services/accountsService';
+import { supabase } from '../utils/supabaseClient';
 
 const Transfers = () => {
-  const [transfers, setTransfers] = useState(mockTransfers);
+  const [transfers, setTransfers] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editTransfer, setEditTransfer] = useState(null);
-  const [form, setForm] = useState({ from: mockAccounts[0], to: mockAccounts[1], amount: '', date: '', description: '' });
+  const [form, setForm] = useState<any>({ from: '', to: '', amount: '', date: '', description: '' });
+
+  useEffect(() => {
+    supabase.from('transfers').select('*').then(({ data }) => setTransfers(data || []));
+    accountsService.getAll().then(({ data }) => setAccounts(data || []));
+  }, []);
 
   const filtered = transfers.filter(t => t.from.toLowerCase().includes(search.toLowerCase()) || t.to.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase()));
 
   const openCreate = () => {
     setEditTransfer(null);
-    setForm({ from: mockAccounts[0], to: mockAccounts[1], amount: '', date: '', description: '' });
+    setForm({ from: '', to: '', amount: '', date: '', description: '' });
     setModalOpen(true);
   };
   const openEdit = (tr) => {
@@ -87,37 +88,42 @@ const Transfers = () => {
         </div>
         {/* Modal */}
         {modalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className="bg-white rounded shadow-lg p-6 w-full max-w-md">
-              <h2 className="text-xl font-bold mb-4">{editTransfer ? 'Edit' : 'Create'} Transfer</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+              <h2 className="text-2xl font-bold mb-6">{editTransfer ? 'Edit' : 'Create'} Transfer</h2>
+              <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block mb-1">From</label>
-                  <select name="from" value={form.from} onChange={handleChange} className="w-full border rounded p-2">
-                    {mockAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
+                  <label className="block mb-1 font-medium text-gray-700">From</label>
+                  <select name="from" value={form.from} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block mb-1">To</label>
-                  <select name="to" value={form.to} onChange={handleChange} className="w-full border rounded p-2">
-                    {mockAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
+                  <label className="block mb-1 font-medium text-gray-700">To</label>
+                  <select name="to" value={form.to} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block mb-1">Amount</label>
-                  <input name="amount" type="number" value={form.amount} onChange={handleChange} className="w-full border rounded p-2" required />
+                  <label className="block mb-1 font-medium text-gray-700">Amount</label>
+                  <input name="amount" type="number" value={form.amount} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
                 </div>
                 <div>
-                  <label className="block mb-1">Date</label>
-                  <input name="date" type="date" value={form.date} onChange={handleChange} className="w-full border rounded p-2" required />
+                  <label className="block mb-1 font-medium text-gray-700">Date</label>
+                  <input name="date" type="date" value={form.date} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
                 </div>
                 <div>
-                  <label className="block mb-1">Description</label>
-                  <input name="description" value={form.description} onChange={handleChange} className="w-full border rounded p-2" />
+                  <label className="block mb-1 font-medium text-gray-700">Description</label>
+                  <input name="description" value={form.description} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
                 </div>
-                <div className="flex justify-end gap-2">
-                  <button type="button" className="px-4 py-2 rounded border" onClick={closeModal}>Cancel</button>
-                  <button type="submit" className="bg-primary text-white px-4 py-2 rounded">{editTransfer ? 'Update' : 'Create'}</button>
+                <div className="flex items-center justify-between pt-4 gap-2">
+                  {editTransfer && (
+                    <button type="button" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-100" onClick={() => handleDelete(editTransfer.id)}>Delete</button>
+                  )}
+                  <div className="flex gap-2 ml-auto">
+                    <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={closeModal}>Cancel</button>
+                    <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2">{editTransfer ? 'Save changes' : 'Add transfer'}</button>
+                  </div>
                 </div>
               </form>
             </div>

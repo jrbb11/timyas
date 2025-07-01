@@ -1,28 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-
-const mockDeposits = [
-  { id: 1, account: 'Cash', category: 'Sales', amount: 500, date: '2024-07-01', description: 'Deposit from sales' },
-  { id: 2, account: 'Bank', category: 'Investment', amount: 2000, date: '2024-07-02', description: 'Investor deposit' },
-];
-
-const mockCategories = ['Sales', 'Investment', 'Other'];
-const mockAccounts = ['Cash', 'Bank', 'Credit Card'];
+import { accountsService } from '../services/accountsService';
+import { supabase } from '../utils/supabaseClient';
 
 type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
 const Deposits = () => {
-  const [deposits, setDeposits] = useState(mockDeposits);
+  const [deposits, setDeposits] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editDeposit, setEditDeposit] = useState<DepositType | null>(null);
-  const [form, setForm] = useState({ account: mockAccounts[0], category: mockCategories[0], amount: '', date: '', description: '' });
+  const [form, setForm] = useState<any>({ account: '', category: '', amount: '', date: '', description: '' });
+
+  useEffect(() => {
+    supabase.from('deposits').select('*').then(({ data }) => setDeposits(data || []));
+    supabase.from('deposit_categories').select('*').then(({ data }) => setCategories(data || []));
+    accountsService.getAll().then(({ data }) => setAccounts(data || []));
+  }, []);
 
   const filtered = deposits.filter(d => d.account.toLowerCase().includes(search.toLowerCase()) || d.category.toLowerCase().includes(search.toLowerCase()) || d.description.toLowerCase().includes(search.toLowerCase()));
 
   const openCreate = () => {
     setEditDeposit(null);
-    setForm({ account: mockAccounts[0], category: mockCategories[0], amount: '', date: '', description: '' });
+    setForm({ account: '', category: '', amount: '', date: '', description: '' });
     setModalOpen(true);
   };
   const openEdit = (dep: DepositType) => {
@@ -97,13 +99,13 @@ const Deposits = () => {
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Account</label>
                   <select name="account" value={form.account} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    {mockAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
+                    {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Category</label>
                   <select name="category" value={form.category} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    {mockCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
                   </select>
                 </div>
                 <div>

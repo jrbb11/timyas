@@ -10,19 +10,10 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
+import { accountsService } from '../services/accountsService';
+import { paymentMethodsService } from '../services/paymentMethodsService';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
-
-const mockMethods = [
-  { id: 1, name: 'Cash' },
-  { id: 2, name: 'Bank Transfer' },
-  { id: 3, name: 'Credit Card' },
-];
-const mockAccounts = [
-  { id: 1, name: 'Cash' },
-  { id: 2, name: 'Bank' },
-  { id: 3, name: 'Credit Card' },
-];
 
 const AllSales = () => {
   const [sales, setSales] = useState<any[]>([]);
@@ -38,8 +29,10 @@ const AllSales = () => {
   const [viewSale, setViewSale] = useState<any | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentSale, setPaymentSale] = useState<any | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method_id: mockMethods[0].id, account_id: mockAccounts[0].id, payment_date: new Date().toISOString().slice(0,10), reference_number: '', note: '' });
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method_id: '', account_id: '', payment_date: new Date().toISOString().slice(0,10), reference_number: '', note: '' });
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,6 +47,14 @@ const AllSales = () => {
       setSales(data || []);
       setLoading(false);
     });
+  }, []);
+
+  useEffect(() => {
+    accountsService.getAll().then(({ data }) => setAccounts(data || []));
+  }, []);
+
+  useEffect(() => {
+    paymentMethodsService.getAll().then(({ data }) => setPaymentMethods(data || []));
   }, []);
 
   const filteredSales = sales.filter((sale) => {
@@ -134,8 +135,8 @@ const AllSales = () => {
     setPaymentSale(sale);
     setPaymentForm({
       amount: sale.due || sale.total_amount,
-      payment_method_id: mockMethods[0].id,
-      account_id: mockAccounts[0].id,
+      payment_method_id: paymentMethods[0]?.id || '',
+      account_id: accounts[0]?.id || '',
       payment_date: new Date().toISOString().slice(0,10),
       reference_number: '',
       note: ''
@@ -151,7 +152,7 @@ const AllSales = () => {
     e.preventDefault();
     if (!paymentSale) return;
     setPaymentLoading(true);
-    await salePaymentsService.create({
+    const { error } = await salePaymentsService.create({
       sale_id: paymentSale.id,
       amount: Number(paymentForm.amount),
       payment_method_id: paymentForm.payment_method_id,
@@ -160,9 +161,12 @@ const AllSales = () => {
       reference_number: paymentForm.reference_number,
       note: paymentForm.note,
     });
-    setPaymentModalOpen(false);
     setPaymentLoading(false);
-    // Optionally update sale payment status here
+    if (error) {
+      setToast({ message: error.message, type: 'error' });
+      return;
+    }
+    setPaymentModalOpen(false);
     salesService.getView().then(({ data, error }) => {
       if (!error) setSales(data || []);
     });
@@ -366,13 +370,13 @@ const AllSales = () => {
               <div>
                 <label className="block mb-1 font-medium text-gray-700">Payment Method</label>
                 <select name="payment_method_id" value={paymentForm.payment_method_id} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                  {mockMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  {paymentMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block mb-1 font-medium text-gray-700">Account</label>
                 <select name="account_id" value={paymentForm.account_id} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                  {mockAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
               <div>

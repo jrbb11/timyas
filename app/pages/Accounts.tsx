@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-
-const mockAccounts = [
-  { id: 1, name: 'Cash', type: 'Asset', balance: 1000.00 },
-  { id: 2, name: 'Bank', type: 'Asset', balance: 5000.00 },
-  { id: 3, name: 'Credit Card', type: 'Liability', balance: -200.00 },
-];
+import { accountsService } from '../services/accountsService';
 
 type AccountType = { id: number; name: string; type: string; balance: number };
 
 const Accounts = () => {
-  const [accounts, setAccounts] = useState(mockAccounts);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editAccount, setEditAccount] = useState<AccountType | null>(null);
-  const [form, setForm] = useState({ name: '', type: 'Asset', balance: 0 });
+  const [form, setForm] = useState<any>({ name: '', type: 'Asset', balance: 0 });
+
+  useEffect(() => {
+    accountsService.getAll().then(({ data }) => setAccounts(data || []));
+  }, []);
 
   const filtered = accounts.filter(a => a.name.toLowerCase().includes(search.toLowerCase()));
 
