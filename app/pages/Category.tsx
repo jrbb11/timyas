@@ -17,9 +17,9 @@ const Category = () => {
   const [categoryToDelete, setCategoryToDelete] = useState<CategoryType | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const ITEMS_PER_PAGE = 10;
 
   // Fetch categories from Supabase
   useEffect(() => {
@@ -121,17 +121,13 @@ const Category = () => {
     cat.name.toLowerCase().includes(search.toLowerCase()) ||
     (cat.description || '').toLowerCase().includes(search.toLowerCase())
   );
-  const totalPages = Math.ceil(filteredCategories.length / ITEMS_PER_PAGE) || 1;
+  const totalRows = filteredCategories.length;
+  const startRow = totalRows === 0 ? 0 : currentPage * rowsPerPage + 1;
+  const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
   const paginatedCategories = filteredCategories.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * rowsPerPage,
+    currentPage * rowsPerPage + rowsPerPage
   );
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
 
   return (
     <AdminLayout
@@ -198,39 +194,16 @@ const Category = () => {
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
           <div>
             Rows per page:
-            <select className="ml-2 border rounded px-2 py-1">
-              <option>10</option>
-              <option>25</option>
-              <option>50</option>
+            <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
             </select>
           </div>
           <div>
-            {filteredCategories.length === 0 ? (
-              <span>No categories found.</span>
-            ) : (
-              <>
-                {((currentPage - 1) * ITEMS_PER_PAGE) + 1}
-                {' - '}
-                {Math.min(currentPage * ITEMS_PER_PAGE, filteredCategories.length)}
-                {' of '}
-                {filteredCategories.length}
-                <button
-                  className="ml-4 px-2 py-1 border rounded disabled:opacity-50"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  prev
-                </button>
-                <button
-                  className="ml-2 px-2 py-1 border rounded disabled:opacity-50"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  next
-                </button>
-                <span className="ml-4">Page {currentPage} of {totalPages}</span>
-              </>
-            )}
+            {startRow} - {endRow} of {totalRows}
+            <button className="ml-4 px-2 py-1" disabled={currentPage === 0} onClick={() => setCurrentPage(p => Math.max(0, p - 1))}>prev</button>
+            <button className="ml-2 px-2 py-1" disabled={endRow >= totalRows} onClick={() => setCurrentPage(p => p + 1)}>next</button>
           </div>
         </div>
         <Modal

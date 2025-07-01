@@ -25,9 +25,9 @@ const Unit = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [unitToDelete, setUnitToDelete] = useState<UnitType | null>(null);
   const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -139,17 +139,13 @@ const Unit = () => {
     unit.short_name.toLowerCase().includes(search.toLowerCase()) ||
     (unit.base_unit || '').toLowerCase().includes(search.toLowerCase())
   );
-  const totalPages = Math.ceil(filteredUnits.length / ITEMS_PER_PAGE) || 1;
+  const totalRows = filteredUnits.length;
+  const startRow = totalRows === 0 ? 0 : currentPage * rowsPerPage + 1;
+  const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
   const paginatedUnits = filteredUnits.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    currentPage * rowsPerPage,
+    currentPage * rowsPerPage + rowsPerPage
   );
-  const handlePageChange = useCallback((page: number) => {
-    setCurrentPage(page);
-  }, []);
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search]);
 
   return (
     <AdminLayout
@@ -223,32 +219,17 @@ const Unit = () => {
         </div>
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
           <div>
-            {filteredUnits.length === 0 ? (
-              <span>No units found.</span>
-            ) : (
-              <>
-                {((currentPage - 1) * ITEMS_PER_PAGE) + 1}
-                {' - '}
-                {Math.min(currentPage * ITEMS_PER_PAGE, filteredUnits.length)}
-                {' of '}
-                {filteredUnits.length}
-                <button
-                  className="ml-4 px-2 py-1 border rounded disabled:opacity-50"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  prev
-                </button>
-                <button
-                  className="ml-2 px-2 py-1 border rounded disabled:opacity-50"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  next
-                </button>
-                <span className="ml-4">Page {currentPage} of {totalPages}</span>
-              </>
-            )}
+            Rows per page:
+            <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+          <div>
+            {startRow} - {endRow} of {totalRows}
+            <button className="ml-4 px-2 py-1" disabled={currentPage === 0} onClick={() => setCurrentPage(p => Math.max(0, p - 1))}>prev</button>
+            <button className="ml-2 px-2 py-1" disabled={endRow >= totalRows} onClick={() => setCurrentPage(p => p + 1)}>next</button>
           </div>
         </div>
         {/* Modal for create/edit */}
