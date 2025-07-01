@@ -201,10 +201,7 @@ create table public.accounts (
     product_code text null,
     cost numeric(10, 2) not null default 0.00,
     qty integer not null default 1,
-<<<<<<< HEAD
-=======
     kilos numeric null,
->>>>>>> 1eb112a (Update project: add kilos column and other changes)
     discount numeric(10, 2) not null default 0.00,
     tax numeric(10, 2) not null default 0.00,
     subtotal numeric GENERATED ALWAYS as ((((cost * (qty)::numeric) - discount) + tax)) STORED (12, 2) null,
@@ -440,3 +437,18 @@ create table public.accounts (
     constraint warehouses_pkey primary key (id),
     constraint warehouses_code_key unique (code)
   ) TABLESPACE pg_default;
+
+-- Audit log for entity changes (sales, purchases, etc.)
+create table public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  entity text not null, -- e.g. 'sale', 'purchase', etc.
+  entity_id uuid not null, -- the id of the entity being changed
+  user_id uuid not null, -- the id of the user who made the change
+  changes jsonb not null, -- what changed, as a JSON object
+  created_at timestamptz not null default now()
+);
+
+create index if not exists audit_logs_entity_idx on public.audit_logs (entity);
+create index if not exists audit_logs_entity_id_idx on public.audit_logs (entity_id);
+create index if not exists audit_logs_user_id_idx on public.audit_logs (user_id);
+create index if not exists audit_logs_created_at_idx on public.audit_logs (created_at desc);

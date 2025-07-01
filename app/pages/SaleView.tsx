@@ -3,6 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { salesService } from '../services/salesService';
 import { saleItemsService } from '../services/saleItemsService';
+import { salePaymentsService } from '../services/salePaymentsService';
+
+const mockMethods = [
+  { id: 1, name: 'Cash' },
+  { id: 2, name: 'Bank Transfer' },
+  { id: 3, name: 'Credit Card' },
+];
+const mockAccounts = [
+  { id: 1, name: 'Cash' },
+  { id: 2, name: 'Bank' },
+  { id: 3, name: 'Credit Card' },
+];
 
 const SaleView = () => {
   const { id } = useParams();
@@ -10,6 +22,9 @@ const SaleView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -25,6 +40,22 @@ const SaleView = () => {
       setLoading(false);
     });
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingPayments(true);
+    salePaymentsService.getBySaleId(id as string).then(({ data }) => {
+      setPayments(data || []);
+      setLoadingPayments(false);
+    });
+  }, [id]);
+
+  const handleDeletePayment = async (paymentId: string) => {
+    setDeletingPaymentId(paymentId);
+    await salePaymentsService.delete(paymentId);
+    setPayments(payments.filter(p => p.id !== paymentId));
+    setDeletingPaymentId(null);
+  };
 
   return (
     <AdminLayout
@@ -77,6 +108,39 @@ const SaleView = () => {
                           <td className="p-3">{Number(item.discount).toFixed(2)}</td>
                           <td className="p-3">{Number(item.tax).toFixed(2)}</td>
                           <td className="p-3">{Number(item.subtotal).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {payments && payments.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-bold mb-2">Payment History</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="p-3 text-left font-semibold">Date</th>
+                        <th className="p-3 text-left font-semibold">Amount</th>
+                        <th className="p-3 text-left font-semibold">Method</th>
+                        <th className="p-3 text-left font-semibold">Account</th>
+                        <th className="p-3 text-left font-semibold">Reference</th>
+                        <th className="p-3 text-left font-semibold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p: any) => (
+                        <tr key={p.id} className="border-b">
+                          <td className="p-3">{p.payment_date}</td>
+                          <td className="p-3">{Number(p.amount).toLocaleString()}</td>
+                          <td className="p-3">{mockMethods.find(m => m.id === p.payment_method_id)?.name || p.payment_method_id}</td>
+                          <td className="p-3">{mockAccounts.find(a => a.id === p.account_id)?.name || p.account_id}</td>
+                          <td className="p-3">{p.reference_number}</td>
+                          <td className="p-3">
+                            <button className="text-red-600 hover:underline" onClick={() => handleDeletePayment(p.id)} disabled={deletingPaymentId === p.id}>{deletingPaymentId === p.id ? 'Deleting...' : 'Delete'}</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -4,6 +4,11 @@ import { customersService } from '../services/customersService';
 import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
 import Modal from '../components/ui/Modal';
 import { useNavigate } from 'react-router-dom';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
 
@@ -29,6 +34,10 @@ const Customers = () => {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [editSuccess, setEditSuccess] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,6 +86,22 @@ const Customers = () => {
     setEditError(null);
     setEditSuccess(false);
     setShowEditModal(true);
+    // Fetch audit logs for this customer
+    setLoadingAudit(true);
+    customersService.getAuditLogs(customer.id).then(async ({ data, error }) => {
+      if (error) setAuditError(error.message);
+      else {
+        setAuditLogs(data || []);
+        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+        if (userIds.length) {
+          const users = await customersService.getUsersByIds(userIds);
+          const map: Record<string, string> = {};
+          users.forEach((u: any) => { map[u.user_id] = u.name || u.email || u.user_id; });
+          setUserMap(map);
+        }
+      }
+      setLoadingAudit(false);
+    });
   };
 
   const handleView = (customer: any) => {
@@ -161,6 +186,34 @@ const Customers = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(filteredCustomers.map(({ id, name, email, phone, address, city, country, created_at }) => ({ id, name, email, phone, address, city, country, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'customers.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportExcel = () => {
+    const ws = XLSX.utils.json_to_sheet(filteredCustomers.map(({ id, name, email, phone, address, city, country, created_at }) => ({ id, name, email, phone, address, city, country, created_at })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Customers');
+    XLSX.writeFile(wb, 'customers.xlsx');
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    autoTable(doc, {
+      head: [["ID", "Name", "Email", "Phone", "Address", "City", "Country", "Created At"]],
+      body: filteredCustomers.map(({ id, name, email, phone, address, city, country, created_at }) => [id, name, email, phone, address, city, country, created_at]),
+    });
+    doc.save('customers.pdf');
+  };
+
   // Toast auto-dismiss
   useEffect(() => {
     if (toast) {
@@ -187,6 +240,9 @@ const Customers = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={handleOpenCreate} type="button">Create</button>
+            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
+            <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
+            <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -372,6 +428,44 @@ const Customers = () => {
             <div className="flex gap-2 mt-4">
               <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" disabled={editLoading}>{editLoading ? 'Saving...' : 'Save'}</button>
               <button type="button" className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200" onClick={() => setShowEditModal(false)} disabled={editLoading}>Cancel</button>
+            </div>
+            {/* Audit log display */}
+            <div className="mb-4">
+              <h3 className="font-semibold mb-1">Change History</h3>
+              {loadingAudit ? (
+                <div className="text-gray-500">Loading history...</div>
+              ) : auditError ? (
+                <div className="text-red-500">{auditError}</div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-gray-400">No changes yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 text-left">When</th>
+                        <th className="p-2 text-left">Who</th>
+                        <th className="p-2 text-left">Changes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log, idx) => (
+                        <tr key={log.id || idx} className="border-t">
+                          <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                          <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
+                          <td className="p-2">
+                            <ul className="list-disc ml-4">
+                              {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
+                                <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </form>
         </Modal>

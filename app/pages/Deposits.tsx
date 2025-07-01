@@ -1,16 +1,138 @@
-import React from 'react';
+import React, { useState } from 'react';
+import AdminLayout from '../layouts/AdminLayout';
+
+const mockDeposits = [
+  { id: 1, account: 'Cash', category: 'Sales', amount: 500, date: '2024-07-01', description: 'Deposit from sales' },
+  { id: 2, account: 'Bank', category: 'Investment', amount: 2000, date: '2024-07-02', description: 'Investor deposit' },
+];
+
+const mockCategories = ['Sales', 'Investment', 'Other'];
+const mockAccounts = ['Cash', 'Bank', 'Credit Card'];
+
+type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
 const Deposits = () => {
-  // TODO: Implement fetching, searching, pagination, and CRUD logic
+  const [deposits, setDeposits] = useState(mockDeposits);
+  const [search, setSearch] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editDeposit, setEditDeposit] = useState<DepositType | null>(null);
+  const [form, setForm] = useState({ account: mockAccounts[0], category: mockCategories[0], amount: '', date: '', description: '' });
+
+  const filtered = deposits.filter(d => d.account.toLowerCase().includes(search.toLowerCase()) || d.category.toLowerCase().includes(search.toLowerCase()) || d.description.toLowerCase().includes(search.toLowerCase()));
+
+  const openCreate = () => {
+    setEditDeposit(null);
+    setForm({ account: mockAccounts[0], category: mockCategories[0], amount: '', date: '', description: '' });
+    setModalOpen(true);
+  };
+  const openEdit = (dep: DepositType) => {
+    setEditDeposit(dep);
+    setForm({ ...dep, amount: dep.amount.toString() });
+    setModalOpen(true);
+  };
+  const closeModal = () => setModalOpen(false);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (editDeposit) {
+      setDeposits(deposits.map(d => d.id === editDeposit.id ? { ...form, id: editDeposit.id, amount: Number(form.amount) } : d));
+    } else {
+      setDeposits([...deposits, { ...form, id: Date.now(), amount: Number(form.amount) }]);
+    }
+    setModalOpen(false);
+  };
+  const handleDelete = (id: number) => setDeposits(deposits.filter(d => d.id !== id));
+
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Deposits</h1>
-        <button className="bg-primary text-white px-4 py-2 rounded">Create Deposit</button>
+    <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-bold">Deposits</h1>
+          <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={openCreate}>Create</button>
+        </div>
+        <input
+          className="mb-4 p-2 border rounded w-full max-w-xs"
+          placeholder="Search deposits..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-2">Account</th>
+                <th className="text-left p-2">Category</th>
+                <th className="text-right p-2">Amount</th>
+                <th className="text-left p-2">Date</th>
+                <th className="text-left p-2">Description</th>
+                <th className="p-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(dep => (
+                <tr key={dep.id} className="border-b hover:bg-gray-50">
+                  <td className="p-2">{dep.account}</td>
+                  <td className="p-2">{dep.category}</td>
+                  <td className="p-2 text-right">{Number(dep.amount).toFixed(2)}</td>
+                  <td className="p-2">{dep.date}</td>
+                  <td className="p-2">{dep.description}</td>
+                  <td className="p-2 flex gap-2">
+                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(dep)}>Edit</button>
+                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(dep.id)}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="text-center p-4 text-gray-400">No deposits found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Modal */}
+        {modalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+              <h2 className="text-2xl font-bold mb-6">{editDeposit ? 'Edit' : 'Create'} Deposit</h2>
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Account</label>
+                  <select name="account" value={form.account} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    {mockAccounts.map(acc => <option key={acc} value={acc}>{acc}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Category</label>
+                  <select name="category" value={form.category} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    {mockCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Amount</label>
+                  <input name="amount" type="number" value={form.amount} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Date</label>
+                  <input name="date" type="date" value={form.date} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
+                </div>
+                <div>
+                  <label className="block mb-1 font-medium text-gray-700">Description</label>
+                  <input name="description" value={form.description} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
+                </div>
+                <div className="flex items-center justify-between pt-4 gap-2">
+                  {editDeposit && (
+                    <button type="button" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-100" onClick={() => handleDelete(editDeposit.id)}>Delete</button>
+                  )}
+                  <div className="flex gap-2 ml-auto">
+                    <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={closeModal}>Cancel</button>
+                    <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2">{editDeposit ? 'Save changes' : 'Add deposit'}</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
-      {/* Table placeholder */}
-      <div className="bg-white rounded shadow p-4">Deposits table here</div>
-    </div>
+    </AdminLayout>
   );
 };
 

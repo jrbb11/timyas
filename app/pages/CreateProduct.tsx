@@ -5,6 +5,7 @@ import { productsService } from '../services/productsService';
 import { brandsService } from '../services/brandsService';
 import { categoriesService } from '../services/categoriesService';
 import { unitsService } from '../services/unitsService';
+import { customersService } from '../services/customersService';
 
 const CreateProduct = () => {
   const { id } = useParams();
@@ -17,6 +18,10 @@ const CreateProduct = () => {
   const [brands, setBrands] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Fetch brands, categories, units
@@ -35,6 +40,26 @@ const CreateProduct = () => {
       });
     }
   }, [id, isEdit]);
+
+  useEffect(() => {
+    if (isEdit && id) {
+      setLoadingAudit(true);
+      productsService.getAuditLogs(id as string).then(async ({ data, error }) => {
+        if (error) setAuditError(error.message);
+        else {
+          setAuditLogs(data || []);
+          const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+          if (userIds.length) {
+            const users = await customersService.getUsersByIds(userIds);
+            const map: Record<string, string> = {};
+            users.forEach((u: any) => { map[u.user_id] = u.name || u.email || u.user_id; });
+            setUserMap(map);
+          }
+        }
+        setLoadingAudit(false);
+      });
+    }
+  }, [isEdit, id]);
 
   const handleChange = (e: any) => {
     const { name, value, type, checked } = e.target;
@@ -187,6 +212,46 @@ const CreateProduct = () => {
           <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading}>{loading ? 'Saving...' : 'Submit'}</button>
           {error && <div className="text-red-600 mt-2">{error}</div>}
           {success && <div className="text-green-600 mt-2">{success}</div>}
+          {/* Audit log display */}
+          {isEdit && (
+            <div className="mb-4">
+              <h3 className="font-semibold mb-1">Change History</h3>
+              {loadingAudit ? (
+                <div className="text-gray-500">Loading history...</div>
+              ) : auditError ? (
+                <div className="text-red-500">{auditError}</div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-gray-400">No changes yet.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="p-2 text-left">When</th>
+                        <th className="p-2 text-left">Who</th>
+                        <th className="p-2 text-left">Changes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs.map((log, idx) => (
+                        <tr key={log.id || idx} className="border-t">
+                          <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                          <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
+                          <td className="p-2">
+                            <ul className="list-disc ml-4">
+                              {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
+                                <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
+                              ))}
+                            </ul>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {/* Image upload */}
         <div className="space-y-6">

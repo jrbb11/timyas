@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
+import Papa from 'papaparse';
 
 const AllProducts = () => {
   const [products, setProducts] = useState<any[]>([]);
@@ -73,43 +74,30 @@ const AllProducts = () => {
 
   const handleExportPDF = () => {
     const doc = new jsPDF();
-    // @ts-ignore
-    doc.autoTable({
-      head: [[
-        'Type', 'Name', 'Code', 'Brand', 'Category', 'Cost', 'Price', 'Unit', 'Quantity',
-      ]],
-      body: filteredProducts.map((product) => [
-        product.type,
-        product.name,
-        product.code,
-        product.brand?.name || '',
-        product.category?.name || '',
-        Number(product.product_cost).toFixed(2),
-        Number(product.product_price).toFixed(2),
-        product.unit,
-        product.quantity || 0,
-      ]),
+    autoTable(doc, {
+      head: [["ID", "Name", "Code", "Brand", "Category", "Price", "Cost", "Stock Alert", "Created At"]],
+      body: filteredProducts.map(({ id, name, code, brand, category, product_price, product_cost, stock_alert, created_at }) => [id, name, code, brand?.name || '', category?.name || '', product_price, product_cost, stock_alert, created_at]),
     });
     doc.save('products.pdf');
   };
 
   const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(
-      filteredProducts.map((product) => ({
-        Type: product.type,
-        Name: product.name,
-        Code: product.code,
-        Brand: product.brand?.name || '',
-        Category: product.category?.name || '',
-        Cost: Number(product.product_cost).toFixed(2),
-        Price: Number(product.product_price).toFixed(2),
-        Unit: product.unit,
-        Quantity: product.quantity || 0,
-      }))
-    );
+    const ws = XLSX.utils.json_to_sheet(filteredProducts.map(({ id, name, code, brand, category, product_price, product_cost, stock_alert, created_at }) => ({ id, name, code, brand: brand?.name || '', category: category?.name || '', product_price, product_cost, stock_alert, created_at })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
     XLSX.writeFile(wb, 'products.xlsx');
+  };
+
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(filteredProducts.map(({ id, name, code, brand_name, category_name, product_price, product_cost, stock_alert, created_at }) => ({ id, name, code, brand_name, category_name, product_price, product_cost, stock_alert, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'products.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleImportClick = () => {
@@ -208,6 +196,7 @@ const AllProducts = () => {
             <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
             <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
             <button className="border px-4 py-2 rounded text-blue-600 border-blue-400 hover:bg-blue-50" onClick={handleImportClick} type="button">Import products</button>
+            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
             <input type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" ref={fileInputRef} onChange={handleImportFile} className="hidden" />
             {importing && <span className="ml-2 text-blue-500">Importing...</span>}
             {importMessage && <span className="ml-2 text-sm text-green-600">{importMessage}</span>}

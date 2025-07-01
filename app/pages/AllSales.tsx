@@ -4,8 +4,25 @@ import { salesService } from '../services/salesService';
 import { FaEye, FaEdit, FaTrash, FaTimesCircle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
+import { salePaymentsService } from '../services/salePaymentsService';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
+
+const mockMethods = [
+  { id: 1, name: 'Cash' },
+  { id: 2, name: 'Bank Transfer' },
+  { id: 3, name: 'Credit Card' },
+];
+const mockAccounts = [
+  { id: 1, name: 'Cash' },
+  { id: 2, name: 'Bank' },
+  { id: 3, name: 'Credit Card' },
+];
 
 const AllSales = () => {
   const [sales, setSales] = useState<any[]>([]);
@@ -19,6 +36,10 @@ const AllSales = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewSale, setViewSale] = useState<any | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentSale, setPaymentSale] = useState<any | null>(null);
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method_id: mockMethods[0].id, account_id: mockAccounts[0].id, payment_date: new Date().toISOString().slice(0,10), reference_number: '', note: '' });
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,13 +76,31 @@ const AllSales = () => {
   const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
 
   const handleExportPDF = () => {
-    // TODO: Implement PDF export logic for sales
-    setToast({ message: 'PDF export not implemented yet', type: 'error' });
+    const doc = new jsPDF();
+    autoTable(doc, {
+      head: [["ID", "Reference", "Invoice", "Date", "Customer", "Warehouse", "Status", "Payment Status", "Total", "Created At"]],
+      body: filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => [id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at]),
+    });
+    doc.save('sales.pdf');
   };
 
   const handleExportExcel = () => {
-    // TODO: Implement Excel export logic for sales
-    setToast({ message: 'Excel export not implemented yet', type: 'error' });
+    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sales');
+    XLSX.writeFile(wb, 'sales.xlsx');
+  };
+
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'sales.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleEdit = (sale: any) => {
@@ -89,6 +128,45 @@ const AllSales = () => {
     setShowDeleteConfirm(false);
     setSaleToDelete(null);
     setLoadingAction(false);
+  };
+
+  const openPaymentModal = (sale: any) => {
+    setPaymentSale(sale);
+    setPaymentForm({
+      amount: sale.due || sale.total_amount,
+      payment_method_id: mockMethods[0].id,
+      account_id: mockAccounts[0].id,
+      payment_date: new Date().toISOString().slice(0,10),
+      reference_number: '',
+      note: ''
+    });
+    setPaymentModalOpen(true);
+  };
+
+  const closePaymentModal = () => setPaymentModalOpen(false);
+
+  const handlePaymentChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setPaymentForm({ ...paymentForm, [e.target.name]: e.target.value });
+
+  const handlePaymentSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!paymentSale) return;
+    setPaymentLoading(true);
+    await salePaymentsService.create({
+      sale_id: paymentSale.id,
+      amount: Number(paymentForm.amount),
+      payment_method_id: paymentForm.payment_method_id,
+      account_id: paymentForm.account_id,
+      payment_date: paymentForm.payment_date,
+      reference_number: paymentForm.reference_number,
+      note: paymentForm.note,
+    });
+    setPaymentModalOpen(false);
+    setPaymentLoading(false);
+    // Optionally update sale payment status here
+    salesService.getView().then(({ data, error }) => {
+      if (!error) setSales(data || []);
+    });
+    setToast({ message: 'Payment recorded', type: 'success' });
   };
 
   // Toast auto-dismiss
@@ -120,6 +198,7 @@ const AllSales = () => {
             <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
             <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
             <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={() => navigate('/sales/create')} type="button">Create</button>
+            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -181,6 +260,14 @@ const AllSales = () => {
                           disabled={loadingAction}
                         >
                           <FaEdit />
+                        </button>
+                        <button
+                          className="text-purple-600 hover:text-purple-800"
+                          onClick={() => openPaymentModal(sale)}
+                          title="Process Payment"
+                          disabled={loadingAction}
+                        >
+                          ₱
                         </button>
                         <button
                           className="text-red-600 hover:text-red-800"
@@ -265,6 +352,43 @@ const AllSales = () => {
           </div>
           <button className="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200" onClick={() => setViewSale(null)}>Close</button>
         </Modal>
+      )}
+      {paymentModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
+            <h2 className="text-2xl font-bold mb-6">Process Payment</h2>
+            <form onSubmit={handlePaymentSubmit} className="space-y-5">
+              <div>
+                <label className="block mb-1 font-medium text-gray-700">Amount</label>
+                <input name="amount" type="number" value={paymentForm.amount} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required min="0.01" step="0.01" />
+              </div>
+              <div>
+                <label className="block mb-1 font-medium text-gray-700">Payment Method</label>
+                <select name="payment_method_id" value={paymentForm.payment_method_id} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                  {mockMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium text-gray-700">Account</label>
+                <select name="account_id" value={paymentForm.account_id} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                  {mockAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block mb-1 font-medium text-gray-700">Date</label>
+                <input name="payment_date" type="date" value={paymentForm.payment_date} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
+              </div>
+              <div>
+                <label className="block mb-1 font-medium text-gray-700">Reference/Note</label>
+                <input name="reference_number" value={paymentForm.reference_number} onChange={handlePaymentChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" placeholder="Reference or note (optional)" />
+              </div>
+              <div className="flex gap-2 justify-end pt-4">
+                <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={closePaymentModal} disabled={paymentLoading}>Cancel</button>
+                <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2" disabled={paymentLoading}>{paymentLoading ? 'Saving...' : 'Save Payment'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </AdminLayout>
   );

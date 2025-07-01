@@ -8,6 +8,7 @@ import { FaEdit, FaTrash, FaPlus, FaMinus } from 'react-icons/fa';
 import Modal from '../components/ui/Modal';
 import { salesService } from '../services/salesService';
 import { saleItemsService } from '../services/saleItemsService';
+import { getCurrentUser } from '../utils/supabaseClient';
 
 const CreateSale = () => {
   const { id } = useParams();
@@ -51,6 +52,12 @@ const CreateSale = () => {
   // Add state for status and payment status
   const [status, setStatus] = useState('order_placed');
   const [paymentStatus, setPaymentStatus] = useState('pending');
+
+  // Add state for audit logs
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [userMap, setUserMap] = useState<Record<string, string>>({});
 
   // Fetch all dropdown data
   useEffect(() => {
@@ -108,6 +115,27 @@ const CreateSale = () => {
       setLoading(false);
     });
   }, [isEdit, id, products]);
+
+  // Fetch audit logs
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    setLoadingAudit(true);
+    salesService.getAuditLogs(id as string).then(async ({ data, error }) => {
+      if (error) setAuditError(error.message);
+      else {
+        setAuditLogs(data || []);
+        // Fetch user names for all user_ids in logs
+        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+        if (userIds.length) {
+          const users = await customersService.getUsersByIds(userIds);
+          const map: Record<string, string> = {};
+          users.forEach((u: any) => { map[u.user_id] = u.name || u.email || u.user_id; });
+          setUserMap(map);
+        }
+      }
+      setLoadingAudit(false);
+    });
+  }, [isEdit, id]);
 
   // Filter products by search
   const filteredProducts = productSearch
@@ -217,6 +245,45 @@ const CreateSale = () => {
     setError(null);
     setSuccess(null);
     try {
+      if (isEdit) {
+        // Fetch current user
+        const user = await getCurrentUser();
+        if (!user) {
+          setError('User not authenticated.');
+          setLoading(false);
+          return;
+        }
+        // Fetch old sale data for diff
+        const { data: oldSale, error: oldError } = await salesService.getById(id as string);
+        if (oldError) {
+          setError('Failed to fetch original sale for audit.');
+          setLoading(false);
+          return;
+        }
+        // Prepare update data
+        const saleData = {
+          invoice_number: invoiceNumber,
+          date,
+          customer: selectedCustomer,
+          warehouse: selectedWarehouse,
+          order_tax: orderTaxPercent,
+          discount: orderDiscount,
+          shipping,
+          status,
+          payment_status: paymentStatus,
+          note,
+          total_amount: grandTotal,
+        };
+        const { error: updateError } = await salesService.update(id as string, saleData, user.id, oldSale);
+        if (updateError) {
+          setError(updateError.message || 'Failed to update sale');
+          setLoading(false);
+          return;
+        }
+        setSuccess('Sale updated successfully!');
+        setLoading(false);
+        return;
+      }
       // Check for duplicate invoice_number
       const { data: existing, error: checkError } = await salesService.getByInvoiceNumber(invoiceNumber);
       if ((existing && existing.length > 0)) {
@@ -270,6 +337,9 @@ const CreateSale = () => {
     setLoading(false);
   };
 
+  const lockedStatuses = ['delivered', 'cancel'];
+  const isEditable = isEdit ? (['order_placed', 'for_delivery'].includes(status) && paymentStatus !== 'paid' && !lockedStatuses.includes(status)) : true;
+
   return (
     <AdminLayout
       title={isEdit ? "Edit Sale" : "Create Sale"}
@@ -278,6 +348,57 @@ const CreateSale = () => {
       }
     >
       <div className="py-6 px-4">
+        {/* Warning or lock message */}
+        {isEdit && isEditable && (
+          <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 rounded">
+            <b>Warning:</b> Editing sales is allowed only for pending/draft sales. All changes are logged for audit purposes.
+          </div>
+        )}
+        {isEdit && !isEditable && (
+          <div className="mb-4 p-3 bg-red-100 border-l-4 border-red-500 text-red-800 rounded">
+            <b>Locked:</b> This sale cannot be edited because it is delivered, paid, or cancelled. For major changes, use a return or credit note.
+          </div>
+        )}
+        {/* Audit log placeholder */}
+        {isEdit && (
+          <div className="mb-4">
+            <h3 className="font-semibold mb-1">Change History</h3>
+            {loadingAudit ? (
+              <div className="text-gray-500">Loading history...</div>
+            ) : auditError ? (
+              <div className="text-red-500">{auditError}</div>
+            ) : auditLogs.length === 0 ? (
+              <div className="text-gray-400">No changes yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-xs border">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="p-2 text-left">When</th>
+                      <th className="p-2 text-left">Who</th>
+                      <th className="p-2 text-left">Changes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditLogs.map((log, idx) => (
+                      <tr key={log.id || idx} className="border-t">
+                        <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
+                        <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
+                        <td className="p-2">
+                          <ul className="list-disc ml-4">
+                            {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
+                              <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">Invoice Number *</label>
@@ -288,6 +409,7 @@ const CreateSale = () => {
               value={invoiceNumber}
               onChange={e => setInvoiceNumber(e.target.value)}
               required
+              disabled={!isEditable}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -515,7 +637,7 @@ const CreateSale = () => {
               <div className="flex justify-between font-bold text-lg"><span>Grand Total</span><span>₱ {grandTotal.toFixed(2)}</span></div>
             </div>
           </div>
-          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading}>
+          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading || !isEditable}>
             {loading ? 'Saving...' : 'Submit'}
           </button>
           {error && <div className="text-red-500 mt-2">{error}</div>}

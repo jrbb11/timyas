@@ -6,6 +6,11 @@ import { warehousesService } from '../services/warehousesService';
 import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 const AllPurchases = () => {
   const [purchases, setPurchases] = useState<any[]>([]);
@@ -64,10 +69,29 @@ const AllPurchases = () => {
   const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
 
   const handleExportPDF = () => {
-    setToast({ message: 'PDF export not implemented yet', type: 'error' });
+    const doc = new jsPDF();
+    autoTable(doc, {
+      head: [["ID", "Reference", "Date", "Supplier", "Warehouse", "Status", "Payment Status", "Total", "Created At"]],
+      body: filteredPurchases.map(({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at }) => [id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at]),
+    });
+    doc.save('purchases.pdf');
   };
   const handleExportExcel = () => {
-    setToast({ message: 'Excel export not implemented yet', type: 'error' });
+    const ws = XLSX.utils.json_to_sheet(filteredPurchases.map(({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Purchases');
+    XLSX.writeFile(wb, 'purchases.xlsx');
+  };
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(filteredPurchases.map(({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'purchases.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
   const handleEdit = (purchase: any) => {
     navigate(`/purchases/edit/${purchase.id}`);
@@ -114,6 +138,7 @@ const AllPurchases = () => {
             <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
             <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
             <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={() => navigate('/purchases/create')} type="button">Create</button>
+            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">

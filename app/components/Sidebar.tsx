@@ -8,6 +8,8 @@ export const Sidebar = () => {
   const [purchasesOpen, setPurchasesOpen] = useState(false);
   const [stockAdjustmentsOpen, setStockAdjustmentsOpen] = useState(false);
   const [customersOpen, setCustomersOpen] = useState(false);
+  const [transactionsOpen, setTransactionsOpen] = useState(false);
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const handleOpenProducts = () => {
     setProductsOpen((open) => {
@@ -191,31 +193,60 @@ export const Sidebar = () => {
             <Link to="/accounts" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
               <FaCreditCard /> Accounts
             </Link>
-            <Link to="/deposits" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaPlus /> Deposits
-            </Link>
-            <Link to="/expenses" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaMoneyBill /> Expenses
-            </Link>
-            <Link to="/transfers" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaExchangeAlt /> Transfers
-            </Link>
-            <Link to="/payment-methods" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaFileInvoice /> Payment Methods
-            </Link>
             <Link to="/ledger" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
               <FaFile /> Ledger
             </Link>
-          </div>
-          {/* Payments Section */}
-          <div>
-            <div className="text-xs text-gray-400 uppercase mb-2 mt-4">Payments</div>
-            <a href="#" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaMoneyBill /> Ledger
-            </a>
-            <a href="#" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaFileInvoice /> Taxes
-            </a>
+            {/* Transactions Submenu */}
+            <div className="relative">
+              <button
+                type="button"
+                className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${transactionsOpen ? 'text-primary font-semibold' : ''}`}
+                onClick={() => setTransactionsOpen(open => !open)}
+              >
+                <FaExchangeAlt /> Transactions
+                <span className={`ml-auto transition-transform ${transactionsOpen ? 'rotate-90' : ''}`}>▶</span>
+              </button>
+              {transactionsOpen && (
+                <div className="absolute left-full top-0 mt-0 ml-2 w-56 bg-white shadow-lg rounded-md z-10 py-2 border border-gray-100">
+                  <Link to="/deposits" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaPlus /> Deposits
+                  </Link>
+                  <Link to="/expenses" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaMoneyBill /> Expenses
+                  </Link>
+                  <Link to="/transfers" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaExchangeAlt /> Transfers
+                  </Link>
+                </div>
+              )}
+            </div>
+            {/* Setup Submenu */}
+            <div className="relative mt-2">
+              <button
+                type="button"
+                className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${setupOpen ? 'text-primary font-semibold' : ''}`}
+                onClick={() => setSetupOpen(open => !open)}
+              >
+                <FaCog /> Setup
+                <span className={`ml-auto transition-transform ${setupOpen ? 'rotate-90' : ''}`}>▶</span>
+              </button>
+              {setupOpen && (
+                <div className="absolute left-full top-0 mt-0 ml-2 w-56 bg-white shadow-lg rounded-md z-10 py-2 border border-gray-100">
+                  <Link to="/payment-methods" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaFileInvoice /> Payment Methods
+                  </Link>
+                  <Link to="/deposit-categories" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaList /> Deposit Categories
+                  </Link>
+                  <Link to="/expense-categories" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaList /> Expense Categories
+                  </Link>
+                  <Link to="/taxes" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaFileInvoice /> Taxes
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
           {/* System Section */}
           <div>
