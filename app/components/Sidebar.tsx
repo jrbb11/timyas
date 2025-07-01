@@ -6,6 +6,48 @@ export const Sidebar = () => {
   const [productsOpen, setProductsOpen] = useState(false);
   const [salesOpen, setSalesOpen] = useState(false);
   const [purchasesOpen, setPurchasesOpen] = useState(false);
+  const [stockAdjustmentsOpen, setStockAdjustmentsOpen] = useState(false);
+
+  const handleOpenProducts = () => {
+    setProductsOpen((open) => {
+      if (!open) {
+        setStockAdjustmentsOpen(false);
+        setSalesOpen(false);
+        setPurchasesOpen(false);
+      }
+      return !open;
+    });
+  };
+  const handleOpenStockAdjustments = () => {
+    setStockAdjustmentsOpen((open) => {
+      if (!open) {
+        setProductsOpen(false);
+        setSalesOpen(false);
+        setPurchasesOpen(false);
+      }
+      return !open;
+    });
+  };
+  const handleOpenSales = () => {
+    setSalesOpen((open) => {
+      if (!open) {
+        setProductsOpen(false);
+        setStockAdjustmentsOpen(false);
+        setPurchasesOpen(false);
+      }
+      return !open;
+    });
+  };
+  const handleOpenPurchases = () => {
+    setPurchasesOpen((open) => {
+      if (!open) {
+        setProductsOpen(false);
+        setStockAdjustmentsOpen(false);
+        setSalesOpen(false);
+      }
+      return !open;
+    });
+  };
 
   return (
     <aside className="w-64 bg-white border-t border-r border-gray-200 h-full hidden md:flex flex-col justify-between">
@@ -23,7 +65,7 @@ export const Sidebar = () => {
               <button
                 type="button"
                 className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${productsOpen ? 'text-primary font-semibold' : ''}`}
-                onClick={() => setProductsOpen((open) => !open)}
+                onClick={handleOpenProducts}
               >
                 <FaShoppingCart /> Products
                 <span className={`ml-auto transition-transform ${productsOpen ? 'rotate-90' : ''}`}>▶</span>
@@ -42,15 +84,6 @@ export const Sidebar = () => {
                   <a href="/products/count-stock" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaBoxes /> Count Stock
                   </a>
-                  <a href="/products/stock-adjustments/create" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
-                    <FaExchangeAlt /> Create Stock Adjustment
-                  </a>
-                  <a href="/products/stock-adjustments" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
-                    <FaList /> All Stock Adjustments
-                  </a>
-                  <a href="/products/stock-movement-history" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
-                    <FaHistory /> Stock Movement History
-                  </a>
                   <a href="/products/category" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaThList /> Category
                   </a>
@@ -63,12 +96,36 @@ export const Sidebar = () => {
                 </div>
               )}
             </div>
+            {/* Stock Adjustments Section as submenu */}
+            <div className="relative mt-2">
+              <button
+                type="button"
+                className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${stockAdjustmentsOpen ? 'text-primary font-semibold' : ''}`}
+                onClick={handleOpenStockAdjustments}
+              >
+                <FaExchangeAlt /> Stock Adjustments
+                <span className={`ml-auto transition-transform ${stockAdjustmentsOpen ? 'rotate-90' : ''}`}>▶</span>
+              </button>
+              {stockAdjustmentsOpen && (
+                <div className="absolute left-full top-0 mt-0 ml-2 w-56 bg-white shadow-lg rounded-md z-10 py-2 border border-gray-100 space-y-1">
+                  <Link to="/products/stock-adjustments/create" className="flex items-center gap-3 px-4 py-2 pl-6 text-gray-700 hover:bg-gray-50">
+                    <FaPlus /> Create Stock Adjustment
+                  </Link>
+                  <Link to="/products/stock-adjustments" className="flex items-center gap-3 px-4 py-2 pl-6 text-gray-700 hover:bg-gray-50">
+                    <FaList /> All Stock Adjustments
+                  </Link>
+                  <Link to="/products/stock-movement-history" className="flex items-center gap-3 px-4 py-2 pl-6 text-gray-700 hover:bg-gray-50">
+                    <FaHistory /> Stock Movement History
+                  </Link>
+                </div>
+              )}
+            </div>
             {/* Sales with submenu */}
             <div className="relative">
               <button
                 type="button"
                 className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${salesOpen ? 'text-primary font-semibold' : ''}`}
-                onClick={() => setSalesOpen((open) => !open)}
+                onClick={handleOpenSales}
               >
                 <FaFileInvoice /> Sales
                 <span className={`ml-auto transition-transform ${salesOpen ? 'rotate-90' : ''}`}>▶</span>
@@ -92,7 +149,7 @@ export const Sidebar = () => {
               <button
                 type="button"
                 className={`flex items-center gap-3 text-gray-700 hover:text-primary py-2 w-full ${purchasesOpen ? 'text-primary font-semibold' : ''}`}
-                onClick={() => setPurchasesOpen((open) => !open)}
+                onClick={handleOpenPurchases}
               >
                 <FaCreditCard /> Purchases
                 <span className={`ml-auto transition-transform ${purchasesOpen ? 'rotate-90' : ''}`}>▶</span>
