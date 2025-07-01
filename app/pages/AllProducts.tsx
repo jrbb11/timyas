@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 import Papa from 'papaparse';
 
+const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
+
 const AllProducts = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -289,9 +291,11 @@ const AllProducts = () => {
           <div>
             Rows per page:
             <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
+              {ROWS_PER_PAGE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
             </select>
           </div>
           <div>

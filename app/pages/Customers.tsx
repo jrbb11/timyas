@@ -10,7 +10,7 @@ import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
 
-const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
+const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 const Customers = () => {
   const [customers, setCustomers] = useState<any[]>([]);

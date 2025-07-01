@@ -11,7 +11,7 @@ import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
 
-const ROWS_PER_PAGE_OPTIONS = [10, 25, 50];
+const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 const mockMethods = [
   { id: 1, name: 'Cash' },
@@ -292,6 +292,7 @@ const AllSales = () => {
               <option value={10}>10</option>
               <option value={25}>25</option>
               <option value={50}>50</option>
+              <option value={100}>100</option>
             </select>
           </div>
           <div>
