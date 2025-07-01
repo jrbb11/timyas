@@ -1,7 +1,7 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { salesService } from '../services/salesService';
-import { FaEye, FaEdit, FaTrash, FaTimesCircle } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaTimesCircle, FaSearch, FaRegCalendarAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 import { salePaymentsService } from '../services/salePaymentsService';
@@ -12,6 +12,12 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { accountsService } from '../services/accountsService';
 import { paymentMethodsService } from '../services/paymentMethodsService';
+import { DateRange } from 'react-date-range';
+import { format } from 'date-fns';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
+
+declare module 'react-date-range';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -33,6 +39,12 @@ const AllSales = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<any>([
+    { startDate: null, endDate: null, key: 'selection' },
+  ]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -57,14 +69,32 @@ const AllSales = () => {
     paymentMethodsService.getAll().then(({ data }) => setPaymentMethods(data || []));
   }, []);
 
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDatePicker]);
+
   const filteredSales = sales.filter((sale) => {
     const searchTerm = search.toLowerCase();
-    return (
+    const matchesSearch =
       sale.reference?.toLowerCase().includes(searchTerm) ||
       sale.invoice_number?.toLowerCase().includes(searchTerm) ||
       sale.customer_name?.toLowerCase().includes(searchTerm) ||
-      sale.warehouse_name?.toLowerCase().includes(searchTerm)
-    );
+      sale.warehouse_name?.toLowerCase().includes(searchTerm);
+    let matchesDate = true;
+    if (dateRange[0].startDate && dateRange[0].endDate) {
+      const saleDate = new Date(sale.date);
+      matchesDate =
+        saleDate >= dateRange[0].startDate &&
+        saleDate <= dateRange[0].endDate;
+    }
+    return matchesSearch && matchesDate;
   });
 
   // Pagination logic
@@ -99,6 +129,19 @@ const AllSales = () => {
     const link = document.createElement('a');
     link.href = url;
     link.setAttribute('download', 'sales.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportSelectedSales = () => {
+    const selectedSales = sales.filter(s => selected.includes(s.id));
+    const csv = Papa.unparse(selectedSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_sales.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -173,6 +216,18 @@ const AllSales = () => {
     setToast({ message: 'Payment recorded', type: 'success' });
   };
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(paginatedSales.map(s => s.id));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
   // Toast auto-dismiss
   useEffect(() => {
     if (toast) {
@@ -188,21 +243,56 @@ const AllSales = () => {
     >
       <div className="py-6 px-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search this table"
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search for sales"
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ boxShadow: 'none' }}
+              />
+            </div>
+            <div className="relative" ref={datePickerRef}>
+              <button
+                className="border px-4 py-2 rounded-lg flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-100 transition"
+                onClick={() => setShowDatePicker(v => !v)}
+                type="button"
+              >
+                <FaRegCalendarAlt />
+                {dateRange[0].startDate && dateRange[0].endDate
+                  ? `${format(dateRange[0].startDate, 'MMM d, yyyy')} – ${format(dateRange[0].endDate, 'MMM d, yyyy')}`
+                  : 'Select date range'}
+              </button>
+              {showDatePicker && (
+                <div className="absolute z-50 mt-2 bg-white rounded shadow-lg p-2">
+                  <DateRange
+                    editableDateInputs={true}
+                    onChange={(item: any) => setDateRange([item.selection])}
+                    moveRangeOnFirstSelection={false}
+                    ranges={dateRange}
+                    maxDate={new Date()}
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      type="button"
+                      className="text-xs text-gray-500 hover:text-black px-2 py-1 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 transition"
+                      onClick={() => { setDateRange([{ startDate: null, endDate: null, key: 'selection' }]); setShowDatePicker(false); }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="border px-4 py-2 rounded text-gray-700 hover:bg-gray-50">Filter</button>
-            <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
-            <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
-            <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={() => navigate('/sales/create')} type="button">Create</button>
-            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
+          <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
+            <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Sales</button>
+            <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/sales/create')} type="button">+ Create</button>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -212,75 +302,45 @@ const AllSales = () => {
             <div className="p-8 text-center text-red-500">{error}</div>
           ) : (
             <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
-                  <th className="p-3 text-left font-semibold">Date</th>
-                  <th className="p-3 text-left font-semibold">Reference</th>
-                  <th className="p-3 text-left font-semibold">Invoice</th>
-                  <th className="p-3 text-left font-semibold">Customer</th>
-                  <th className="p-3 text-left font-semibold">Warehouse</th>
-                  <th className="p-3 text-left font-semibold">Status</th>
-                  <th className="p-3 text-left font-semibold">Grand Total</th>
-                  <th className="p-3 text-left font-semibold">Paid</th>
-                  <th className="p-3 text-left font-semibold">Due</th>
-                  <th className="p-3 text-left font-semibold">Payment Status</th>
-                  <th className="p-3 text-center font-semibold" style={{ width: '110px' }}>Action</th>
+              <thead className="sticky top-0 bg-white z-10">
+                <tr className="border-b text-gray-700 text-base">
+                  <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === paginatedSales.length && paginatedSales.length > 0} onChange={handleSelectAll} /></th>
+                  <th className="p-4 text-left font-semibold">Date</th>
+                  <th className="p-4 text-left font-semibold">Reference</th>
+                  <th className="p-4 text-left font-semibold">Invoice</th>
+                  <th className="p-4 text-left font-semibold">Customer</th>
+                  <th className="p-4 text-left font-semibold">Warehouse</th>
+                  <th className="p-4 text-left font-semibold">Status</th>
+                  <th className="p-4 text-left font-semibold">Grand Total</th>
+                  <th className="p-4 text-left font-semibold">Paid</th>
+                  <th className="p-4 text-left font-semibold">Due</th>
+                  <th className="p-4 text-left font-semibold">Payment Status</th>
+                  <th className="p-4 text-center font-semibold" style={{ width: '110px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedSales.map((sale) => (
-                  <tr key={sale.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3"><input type="checkbox" /></td>
-                    <td className="p-3">{sale.date}</td>
-                    <td className="p-3 text-purple-600 hover:underline cursor-pointer">{sale.reference}</td>
-                    <td className="p-3">{sale.invoice_number}</td>
-                    <td className="p-3">{sale.customer_name}</td>
-                    <td className="p-3">{sale.warehouse_name}</td>
-                    <td className="p-3">
-                      {sale.status === 'cancel' ? (
-                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">cancelled</span>
-                      ) : (
-                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{sale.status}</span>
-                      )}
+                  <tr key={sale.id} className={`border-b hover:bg-gray-50 transition ${selected.includes(sale.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="p-4"><input type="checkbox" checked={selected.includes(sale.id)} onChange={() => handleSelectRow(sale.id)} /></td>
+                    <td className="p-4 font-medium">{sale.date}</td>
+                    <td className="p-4 text-purple-600 hover:underline cursor-pointer">{sale.reference}</td>
+                    <td className="p-4">{sale.invoice_number}</td>
+                    <td className="p-4">{sale.customer_name}</td>
+                    <td className="p-4">{sale.warehouse_name}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${sale.status === 'delivered' ? 'bg-green-50 text-green-600' : sale.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : sale.status === 'cancel' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'}`}>{sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}</span>
                     </td>
-                    <td className="p-3">{Number(sale.total_amount).toLocaleString()}</td>
-                    <td className="p-3">{Number(sale.paid || 0).toLocaleString()}</td>
-                    <td className="p-3">{Number(sale.due || 0).toLocaleString()}</td>
-                    <td className="p-3"><span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">{sale.payment_status}</span></td>
-                    <td className="p-3" style={{ minWidth: '110px', height: '100%' }}>
+                    <td className="p-4 font-semibold">{Number(sale.total_amount).toLocaleString()}</td>
+                    <td className="p-4">{Number(sale.paid || 0).toLocaleString()}</td>
+                    <td className="p-4">{Number(sale.due || 0).toLocaleString()}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${sale.payment_status === 'paid' ? 'bg-green-50 text-green-600' : sale.payment_status === 'partial' ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-600'}`}>{sale.payment_status.charAt(0).toUpperCase() + sale.payment_status.slice(1)}</span>
+                    </td>
+                    <td className="p-4 text-center" style={{ minWidth: '110px', height: '100%' }}>
                       <div className="flex gap-2 items-center justify-center h-full">
-                        <button
-                          className="text-blue-600 hover:text-blue-800"
-                          onClick={() => handleView(sale)}
-                          title="View"
-                        >
-                          <FaEye />
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-800"
-                          onClick={() => handleEdit(sale)}
-                          title="Edit"
-                          disabled={loadingAction}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          className="text-purple-600 hover:text-purple-800"
-                          onClick={() => openPaymentModal(sale)}
-                          title="Process Payment"
-                          disabled={loadingAction}
-                        >
-                          ₱
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800"
-                          onClick={() => { setSaleToDelete(sale); setShowDeleteConfirm(true); }}
-                          title="Cancel"
-                          disabled={loadingAction}
-                        >
-                          <FaTimesCircle />
-                        </button>
+                        <button className="text-gray-500 hover:text-blue-600 p-2 rounded-full transition" onClick={() => handleView(sale)} title="View"><FaEye /></button>
+                        <button className="text-gray-500 hover:text-green-600 p-2 rounded-full transition" onClick={() => handleEdit(sale)} title="Edit" disabled={loadingAction}><FaEdit /></button>
+                        <button className="text-gray-500 hover:text-red-600 p-2 rounded-full transition" onClick={() => { setSaleToDelete(sale); setShowDeleteConfirm(true); }} title="Delete" disabled={loadingAction}><FaTrash /></button>
                       </div>
                     </td>
                   </tr>
@@ -289,20 +349,26 @@ const AllSales = () => {
             </table>
           )}
         </div>
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <div>
-            Rows per page:
-            <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
+        <div className="flex items-center justify-between mt-6 text-base text-gray-600">
+          <div className="flex items-center gap-4">
+            <label className="text-gray-600 text-sm" htmlFor="rowsPerPage">Rows:</label>
+            <select
+              id="rowsPerPage"
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black bg-white"
+              value={rowsPerPage}
+              onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}
+              style={{ minWidth: 70 }}
+            >
               <option value={10}>10</option>
-              <option value={25}>25</option>
               <option value={50}>50</option>
               <option value={100}>100</option>
             </select>
+            <span>Showing <span className="font-semibold text-gray-900">{startRow}-{endRow}</span> of <span className="font-semibold text-gray-900">{totalRows}</span> entries</span>
           </div>
-          <div>
-            {startRow} - {endRow} of {totalRows}
-            <button className="ml-4 px-2 py-1" disabled={currentPage === 0} onClick={() => setCurrentPage(p => Math.max(0, p - 1))}>prev</button>
-            <button className="ml-2 px-2 py-1" disabled={endRow >= totalRows} onClick={() => setCurrentPage(p => p + 1)}>next</button>
+          <div className="flex items-center gap-2">
+            <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100" onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0}>Previous</button>
+            <span className="font-semibold text-gray-900">{currentPage + 1}</span>
+            <button className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100" onClick={() => setCurrentPage(p => p + 1)} disabled={endRow >= totalRows}>Next</button>
           </div>
         </div>
       </div>
@@ -393,6 +459,12 @@ const AllSales = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+          <span className="font-semibold text-gray-700">{selected.length} selected</span>
+          <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelectedSales}>Export Sales</button>
         </div>
       )}
     </AdminLayout>

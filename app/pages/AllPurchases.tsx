@@ -1,9 +1,9 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { purchasesService } from '../services/purchasesService';
 import { suppliersService } from '../services/suppliersService';
 import { warehousesService } from '../services/warehousesService';
-import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/ui/Modal';
 import Papa from 'papaparse';
@@ -11,6 +11,11 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
+import { DateRange } from 'react-date-range';
+import { format } from 'date-fns';
+import { FaRegCalendarAlt } from 'react-icons/fa';
+import 'react-date-range/dist/styles.css';
+import 'react-date-range/dist/theme/default.css';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -29,6 +34,18 @@ const AllPurchases = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
+  const [sortBy, setSortBy] = useState('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [selected, setSelected] = useState<any[]>([]);
+  const [dateRange, setDateRange] = useState<any>([
+    {
+      startDate: null,
+      endDate: null,
+      key: 'selection',
+    },
+  ]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -52,17 +69,55 @@ const AllPurchases = () => {
     });
   }, []);
 
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDatePicker]);
+
   const filteredPurchases = purchases.filter((purchase) => {
     const searchTerm = search.toLowerCase();
-    return (
+    const matchesSearch =
       purchase.reference?.toLowerCase().includes(searchTerm) ||
       purchase.supplier_name?.toLowerCase().includes(searchTerm) ||
-      purchase.warehouse_name?.toLowerCase().includes(searchTerm)
-    );
+      purchase.warehouse_name?.toLowerCase().includes(searchTerm);
+    let matchesDate = true;
+    if (dateRange[0].startDate && dateRange[0].endDate) {
+      const purchaseDate = new Date(purchase.date);
+      matchesDate =
+        purchaseDate >= dateRange[0].startDate &&
+        purchaseDate <= dateRange[0].endDate;
+    }
+    return matchesSearch && matchesDate;
   });
 
-  // Pagination logic
-  const paginatedPurchases = filteredPurchases.slice(
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const sortedPurchases = [...filteredPurchases].sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+    if (sortBy === 'total_amount') {
+      aValue = Number(aValue);
+      bValue = Number(bValue);
+    }
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const paginatedPurchases = sortedPurchases.slice(
     currentPage * rowsPerPage,
     currentPage * rowsPerPage + rowsPerPage
   );
@@ -95,6 +150,18 @@ const AllPurchases = () => {
     link.click();
     document.body.removeChild(link);
   };
+  const handleExportSelectedPurchases = () => {
+    const selectedPurchases = purchases.filter(p => selected.includes(p.id));
+    const csv = Papa.unparse(selectedPurchases.map(({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, date, supplier_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_purchases.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   const handleEdit = (purchase: any) => {
     navigate(`/purchases/edit/${purchase.id}`);
   };
@@ -119,142 +186,232 @@ const AllPurchases = () => {
     }
   }, [toast]);
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(paginatedPurchases.map(p => p.id));
+    } else {
+      setSelected([]);
+    }
+  };
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  // Add a helper for supplier avatar/initials
+  const getInitials = (name: string) => name ? name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() : '';
+
   return (
-    <AdminLayout
-      title="All Purchases"
-      breadcrumb={<span>Purchases &gt; <span className="text-gray-900">All Purchases</span></span>}
-    >
-      <div className="py-6 px-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search this table"
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+    <div className="min-h-screen bg-gray-50">
+      <AdminLayout
+        title="All Purchases"
+        breadcrumb={<span>Purchases &gt; <span className="text-gray-900">All Purchases</span></span>}
+      >
+        <div className="py-6 px-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+            <div className="flex-1 flex gap-2 items-center">
+              <div className="relative w-full max-w-xs">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FaSearch />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search for purchases"
+                  className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ boxShadow: 'none' }}
+                />
+              </div>
+              <div className="relative" ref={datePickerRef}>
+                <button
+                  className="border px-4 py-2 rounded-lg flex items-center gap-2 bg-white text-gray-700 hover:bg-gray-100 transition"
+                  onClick={() => setShowDatePicker(v => !v)}
+                  type="button"
+                >
+                  <FaRegCalendarAlt />
+                  {dateRange[0].startDate && dateRange[0].endDate
+                    ? `${format(dateRange[0].startDate, 'MMM d, yyyy')} – ${format(dateRange[0].endDate, 'MMM d, yyyy')}`
+                    : 'Select date range'}
+                </button>
+                {showDatePicker && (
+                  <div className="absolute z-50 mt-2 bg-white rounded shadow-lg p-2">
+                    <DateRange
+                      editableDateInputs={true}
+                      onChange={item => setDateRange([item.selection])}
+                      moveRangeOnFirstSelection={false}
+                      ranges={dateRange}
+                      maxDate={new Date()}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        type="button"
+                        className="text-xs text-gray-500 hover:text-black px-2 py-1 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 transition"
+                        onClick={() => { setDateRange([{ startDate: null, endDate: null, key: 'selection' }]); setShowDatePicker(false); }}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
+              <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Purchases</button>
+              <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/purchases/create')} type="button">+ Create</button>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="border px-4 py-2 rounded text-gray-700 hover:bg-gray-50">Filter</button>
-            <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
-            <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
-            <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={() => navigate('/purchases/create')} type="button">Create</button>
-            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
-          </div>
-        </div>
-        <div className="overflow-x-auto bg-white rounded-lg shadow">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">Loading...</div>
-          ) : error ? (
-            <div className="p-8 text-center text-red-500">{error}</div>
-          ) : (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
-                  <th className="p-3 text-left font-semibold">Date</th>
-                  <th className="p-3 text-left font-semibold">Reference</th>
-                  <th className="p-3 text-left font-semibold">Supplier</th>
-                  <th className="p-3 text-left font-semibold">Warehouse</th>
-                  <th className="p-3 text-left font-semibold">Status</th>
-                  <th className="p-3 text-left font-semibold">Grand Total</th>
-                  <th className="p-3 text-center font-semibold">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedPurchases.map((purchase) => (
-                  <tr key={purchase.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3"><input type="checkbox" /></td>
-                    <td className="p-3">{purchase.date}</td>
-                    <td className="p-3 text-purple-600 hover:underline cursor-pointer" onClick={() => navigate(`/purchases/view/${purchase.id}`)}>{purchase.reference}</td>
-                    <td className="p-3">{purchase.supplier_name}</td>
-                    <td className="p-3">{purchase.warehouse_name}</td>
-                    <td className="p-3"><span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">{purchase.status}</span></td>
-                    <td className="p-3">{Number(purchase.total_amount).toLocaleString()}</td>
-                    <td className="p-3 text-center" style={{ minWidth: '110px', height: '100%' }}>
-                      <div className="flex gap-2 items-center justify-center h-full">
-                        <button
-                          className="text-blue-600 hover:text-blue-800"
-                          onClick={() => handleView(purchase)}
-                          title="View"
-                        >
-                          <FaEye />
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-800"
-                          onClick={() => handleEdit(purchase)}
-                          title="Edit"
-                          disabled={loadingAction}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800"
-                          onClick={() => { setPurchaseToDelete(purchase); setShowDeleteConfirm(true); }}
-                          title="Delete"
-                          disabled={loadingAction}
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
+          <div className="bg-white rounded-2xl shadow-lg p-0 overflow-x-auto">
+            {loading ? (
+              <div className="p-8 text-center text-gray-500">Loading...</div>
+            ) : error ? (
+              <div className="p-8 text-center text-red-500">{error}</div>
+            ) : (
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b text-gray-700 text-base">
+                    <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === paginatedPurchases.length && paginatedPurchases.length > 0} onChange={handleSelectAll} /></th>
+                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('date')}>Date {sortBy === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold">Reference</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('supplier_name')}>Supplier {sortBy === 'supplier_name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold">Warehouse</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('status')}>Status {sortBy === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('total_amount')}>Grand Total {sortBy === 'total_amount' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-center font-semibold">Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-          <div>
-            Rows per page:
-            <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
-              {ROWS_PER_PAGE_OPTIONS.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
+                </thead>
+                <tbody>
+                  {paginatedPurchases.map((purchase) => (
+                    <tr key={purchase.id} className={`border-b hover:bg-gray-50 transition ${selected.includes(purchase.id) ? 'bg-blue-50' : ''}`}>
+                      <td className="p-4"><input type="checkbox" checked={selected.includes(purchase.id)} onChange={() => handleSelectRow(purchase.id)} /></td>
+                      <td className="p-4 font-medium">{purchase.date}</td>
+                      <td className="p-4 text-purple-600 hover:underline cursor-pointer" onClick={() => navigate(`/purchases/view/${purchase.id}`)}>{purchase.reference}</td>
+                      <td className="p-4 flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-200 text-gray-700 font-bold text-base">
+                          {getInitials(purchase.supplier_name)}
+                        </span>
+                        <span className="font-medium">{purchase.supplier_name}</span>
+                      </td>
+                      <td className="p-4">{purchase.warehouse_name}</td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${purchase.status === 'received' ? 'bg-green-50 text-green-600' : purchase.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : purchase.status === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'}`}>{purchase.status.charAt(0).toUpperCase() + purchase.status.slice(1)}</span>
+                      </td>
+                      <td className="p-4 font-semibold">{Number(purchase.total_amount).toLocaleString()}</td>
+                      <td className="p-4 text-center" style={{ minWidth: '110px', height: '100%' }}>
+                        <div className="flex gap-2 items-center justify-center h-full">
+                          <button
+                            className="text-gray-500 hover:text-blue-600 p-2 rounded-full transition"
+                            onClick={() => handleView(purchase)}
+                            title="View"
+                          >
+                            <FaEye />
+                          </button>
+                          <button
+                            className="text-gray-500 hover:text-green-600 p-2 rounded-full transition"
+                            onClick={() => handleEdit(purchase)}
+                            title="Edit"
+                            disabled={loadingAction}
+                          >
+                            <FaEdit />
+                          </button>
+                          <button
+                            className="text-gray-500 hover:text-red-600 p-2 rounded-full transition"
+                            onClick={() => { setPurchaseToDelete(purchase); setShowDeleteConfirm(true); }}
+                            title="Delete"
+                            disabled={loadingAction}
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {/* Floating Action Bar for Bulk Actions */}
+            {selected.length > 0 && (
+              <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+                <span className="font-semibold text-gray-700">{selected.length} selected</span>
+                <button
+                  className="text-gray-700 hover:text-gray-900 font-semibold"
+                  onClick={() => handleExportSelectedPurchases()}
+                >
+                  Export Purchases
+                </button>
+              </div>
+            )}
           </div>
-          <div>
-            {startRow} - {endRow} of {totalRows}
-            <button className="ml-4 px-2 py-1" disabled={currentPage === 0} onClick={() => setCurrentPage(p => Math.max(0, p - 1))}>prev</button>
-            <button className="ml-2 px-2 py-1" disabled={endRow >= totalRows} onClick={() => setCurrentPage(p => p + 1)}>next</button>
-          </div>
-        </div>
-        {/* Delete Confirmation Modal */}
-        <Modal
-          isOpen={showDeleteConfirm}
-          onClose={() => { setShowDeleteConfirm(false); setPurchaseToDelete(null); }}
-          title="Delete Purchase"
-          footer={
-            <div className="flex justify-end gap-2">
-              <button
-                className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200"
-                onClick={() => { setShowDeleteConfirm(false); setPurchaseToDelete(null); }}
-                disabled={loadingAction}
+          {/* Pagination and Entry Count */}
+          <div className="flex items-center justify-between mt-6 text-base text-gray-600">
+            <div className="flex items-center gap-4">
+              <label className="text-gray-600 text-sm" htmlFor="rowsPerPage">Rows:</label>
+              <select
+                id="rowsPerPage"
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-black bg-white"
+                value={rowsPerPage}
+                onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}
+                style={{ minWidth: 70 }}
               >
-                Cancel
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>Showing <span className="font-semibold text-gray-900">{startRow}-{endRow}</span> of <span className="font-semibold text-gray-900">{totalRows}</span> entries</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100"
+                onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+              >
+                Previous
               </button>
+              <span className="font-semibold text-gray-900">{currentPage + 1}</span>
               <button
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                onClick={handleDelete}
-                disabled={loadingAction}
+                className="px-3 py-1 rounded border border-gray-300 bg-white hover:bg-gray-100"
+                onClick={() => setCurrentPage(p => p + 1)}
+                disabled={endRow >= totalRows}
               >
-                {loadingAction ? 'Deleting...' : 'Delete'}
+                Next
               </button>
             </div>
-          }
-        >
-          <p>Are you sure you want to delete this purchase?</p>
-          <p className="font-semibold mt-2">{purchaseToDelete?.reference}</p>
-        </Modal>
-        {/* Toast Notification */}
-        {toast && (
-          <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
-            {toast.message}
           </div>
-        )}
-      </div>
-    </AdminLayout>
+          {/* Delete Confirmation Modal */}
+          <Modal
+            isOpen={showDeleteConfirm}
+            onClose={() => { setShowDeleteConfirm(false); setPurchaseToDelete(null); }}
+            title="Delete Purchase"
+            footer={
+              <div className="flex justify-end gap-2">
+                <button
+                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200"
+                  onClick={() => { setShowDeleteConfirm(false); setPurchaseToDelete(null); }}
+                  disabled={loadingAction}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                  onClick={handleDelete}
+                  disabled={loadingAction}
+                >
+                  {loadingAction ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            }
+          >
+            <p>Are you sure you want to delete this purchase?</p>
+            <p className="font-semibold mt-2">{purchaseToDelete?.reference}</p>
+          </Modal>
+          {/* Toast Notification */}
+          {toast && (
+            <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+              {toast.message}
+            </div>
+          )}
+        </div>
+      </AdminLayout>
+    </div>
   );
 };
 
