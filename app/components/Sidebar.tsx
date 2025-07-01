@@ -7,6 +7,7 @@ export const Sidebar = () => {
   const [salesOpen, setSalesOpen] = useState(false);
   const [purchasesOpen, setPurchasesOpen] = useState(false);
   const [stockAdjustmentsOpen, setStockAdjustmentsOpen] = useState(false);
+  const [customersOpen, setCustomersOpen] = useState(false);
 
   const handleOpenProducts = () => {
     setProductsOpen((open) => {
@@ -44,6 +45,17 @@ export const Sidebar = () => {
         setProductsOpen(false);
         setStockAdjustmentsOpen(false);
         setSalesOpen(false);
+      }
+      return !open;
+    });
+  };
+  const handleOpenCustomers = () => {
+    setCustomersOpen((open) => {
+      if (!open) {
+        setProductsOpen(false);
+        setStockAdjustmentsOpen(false);
+        setSalesOpen(false);
+        setPurchasesOpen(false);
       }
       return !open;
     });
@@ -168,9 +180,32 @@ export const Sidebar = () => {
             <a href="#" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
               <FaTags /> Discounts
             </a>
-            <a href="#" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+            {/* Customers link */}
+            <Link to="/customers" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
               <FaUsers /> Customers
-            </a>
+            </Link>
+          </div>
+          {/* Finance Section */}
+          <div>
+            <div className="text-xs text-gray-400 uppercase mb-2 mt-4">Finance</div>
+            <Link to="/accounts" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaCreditCard /> Accounts
+            </Link>
+            <Link to="/deposits" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaPlus /> Deposits
+            </Link>
+            <Link to="/expenses" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaMoneyBill /> Expenses
+            </Link>
+            <Link to="/transfers" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaExchangeAlt /> Transfers
+            </Link>
+            <Link to="/payment-methods" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaFileInvoice /> Payment Methods
+            </Link>
+            <Link to="/ledger" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaFile /> Ledger
+            </Link>
           </div>
           {/* Payments Section */}
           <div>
