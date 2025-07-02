@@ -58,6 +58,9 @@ const AllSales = () => {
         return;
       }
       setSales(data || []);
+      if (data && data.length > 0) {
+        console.log('First sale object:', data[0]);
+      }
       setLoading(false);
     });
   }, []);
@@ -140,21 +143,21 @@ const AllSales = () => {
   const handleExportPDF = () => {
     const doc = new jsPDF();
     autoTable(doc, {
-      head: [["ID", "Reference", "Invoice", "Date", "Customer", "Warehouse", "Status", "Payment Status", "Total", "Created At"]],
-      body: filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => [id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at]),
+      head: [["ID", "Reference", "Invoice", "Date", "Customer", "Warehouse", "Status", "Payment Status", "Grand Total", "Shipping Fee", "Total", "Created At"]],
+      body: filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => [id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, Number(total_amount - (shipping || 0)).toLocaleString(), Number(shipping || 0).toLocaleString(), Number(total_amount).toLocaleString(), created_at]),
     });
     doc.save('sales.pdf');
   };
 
   const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sales');
     XLSX.writeFile(wb, 'sales.xlsx');
   };
 
   const handleExportCSV = () => {
-    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -167,7 +170,7 @@ const AllSales = () => {
 
   const handleExportSelectedSales = () => {
     const selectedSales = sales.filter(s => selected.includes(s.id));
-    const csv = Papa.unparse(selectedSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, created_at })));
+    const csv = Papa.unparse(selectedSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -349,6 +352,7 @@ const AllSales = () => {
                   <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('total_amount')}>
                     Grand Total {sortConfig.key === 'total_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th className="p-4 text-left font-semibold">Shipping Fee</th>
                   <th className="p-4 text-left font-semibold">Paid</th>
                   <th className="p-4 text-left font-semibold">Due</th>
                   <th className="p-4 text-left font-semibold">Payment Status</th>
@@ -367,7 +371,8 @@ const AllSales = () => {
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${sale.status === 'delivered' ? 'bg-green-50 text-green-600' : sale.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : sale.status === 'cancel' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'}`}>{sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}</span>
                     </td>
-                    <td className="p-4 font-semibold">{Number(sale.total_amount).toLocaleString()}</td>
+                    <td className="p-4 font-semibold">{Number(sale.total_amount - (sale.shipping || 0)).toLocaleString()}</td>
+                    <td className="p-4">{Number(sale.shipping || 0).toLocaleString()}</td>
                     <td className="p-4">{Number(sale.paid || 0).toLocaleString()}</td>
                     <td className="p-4">{Number(sale.due || 0).toLocaleString()}</td>
                     <td className="p-4">
@@ -455,6 +460,7 @@ const AllSales = () => {
             <div><span className="font-medium text-gray-500">Status:</span> <span className="font-semibold text-gray-900">{viewSale.status}</span></div>
             <div><span className="font-medium text-gray-500">Payment Status:</span> <span className="font-semibold text-gray-900">{viewSale.payment_status}</span></div>
             <div><span className="font-medium text-gray-500">Total:</span> <span className="font-semibold text-gray-900">{Number(viewSale.total_amount).toLocaleString()}</span></div>
+            <div><span className="font-medium text-gray-500">Shipping Fee:</span> <span className="font-semibold text-gray-900">{Number(viewSale.shipping || 0).toLocaleString()}</span></div>
             <div><span className="font-medium text-gray-500">Paid:</span> <span className="font-semibold text-gray-900">{Number(viewSale.paid || 0).toLocaleString()}</span></div>
             <div><span className="font-medium text-gray-500">Due:</span> <span className="font-semibold text-gray-900">{Number(viewSale.due || 0).toLocaleString()}</span></div>
           </div>
