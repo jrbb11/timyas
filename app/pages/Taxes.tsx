@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 
 const mockTaxes = [
   { id: 1, name: 'VAT', rate: 12 },
@@ -106,8 +106,8 @@ const Taxes = () => {
                   <td className="p-4">{tax.name}</td>
                   <td className="p-4 text-right">{tax.rate}</td>
                   <td className="p-4 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(tax)}>Edit</button>
-                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(tax.id)}>Delete</button>
+                    <button className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit" onClick={() => openEdit(tax)}><FaEdit size={15} /></button>
+                    <button className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete" onClick={() => handleDelete(tax.id)}><FaTrash size={15} /></button>
                   </td>
                 </tr>
               ))}

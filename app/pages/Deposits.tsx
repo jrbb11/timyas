@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 
 type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
@@ -14,6 +14,7 @@ const Deposits = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editDeposit, setEditDeposit] = useState<DepositType | null>(null);
   const [form, setForm] = useState<any>({ account: '', category: '', amount: '', date: '', description: '' });
+  const [selected, setSelected] = useState<number[]>([]);
 
   useEffect(() => {
     supabase.from('deposits').select('*').then(({ data }) => setDeposits(data || []));
@@ -45,6 +46,9 @@ const Deposits = () => {
     setModalOpen(false);
   };
   const handleDelete = (id: number) => setDeposits(deposits.filter(d => d.id !== id));
+  const handleExportSelected = () => {
+    // Implementation of export selected deposits
+  };
 
   return (
     <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
@@ -70,30 +74,33 @@ const Deposits = () => {
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="p-4 text-left font-semibold">Account</th>
-                <th className="p-4 text-left font-semibold">Category</th>
-                <th className="p-4 text-right font-semibold">Amount</th>
+                <th className="p-4 text-left font-semibold"><input type="checkbox" /></th>
                 <th className="p-4 text-left font-semibold">Date</th>
+                <th className="p-4 text-left font-semibold">Account</th>
+                <th className="p-4 text-left font-semibold">Amount</th>
                 <th className="p-4 text-left font-semibold">Description</th>
-                <th className="p-4 font-semibold">Actions</th>
+                <th className="p-4 text-left font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(dep => (
-                <tr key={dep.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">{dep.account}</td>
-                  <td className="p-4">{dep.category}</td>
-                  <td className="p-4 text-right">{Number(dep.amount).toFixed(2)}</td>
-                  <td className="p-4">{dep.date}</td>
-                  <td className="p-4">{dep.description}</td>
-                  <td className="p-4 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(dep)}>Edit</button>
-                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(dep.id)}>Delete</button>
-                  </td>
+              {deposits.length === 0 ? (
+                <tr>
+                  <td className="p-6 text-center text-gray-400" colSpan={6}>No deposits found</td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center p-6 text-gray-400">No deposits found.</td></tr>
+              ) : (
+                deposits.map((deposit) => (
+                  <tr key={deposit.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4"><input type="checkbox" /></td>
+                    <td className="p-4">{deposit.date}</td>
+                    <td className="p-4">{deposit.account}</td>
+                    <td className="p-4">{deposit.amount}</td>
+                    <td className="p-4">{deposit.description}</td>
+                    <td className="p-4 flex gap-2">
+                      <button className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit" onClick={() => openEdit(deposit)}><FaEdit size={15} /></button>
+                      <button className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete" onClick={() => handleDelete(deposit.id)}><FaTrash size={15} /></button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -139,6 +146,12 @@ const Deposits = () => {
                 </div>
               </form>
             </div>
+          </div>
+        )}
+        {selected.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelected}>Export Deposits</button>
           </div>
         )}
       </div>

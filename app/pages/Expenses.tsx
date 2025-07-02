@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 
 type ExpenseType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
@@ -73,7 +73,7 @@ const Expenses = () => {
   return (
     <AdminLayout title="Expenses" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Expenses</span></span>}>
       <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex-1 flex gap-2 items-center">
             <div className="relative w-full max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -88,51 +88,45 @@ const Expenses = () => {
               />
             </div>
           </div>
-          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" type="button">+ Create</button>
         </div>
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="p-3 text-left font-semibold">
-                  <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={handleSelectAll} />
-                </th>
-                <th className="text-left p-2">Account</th>
-                <th className="text-left p-2">Category</th>
-                <th className="text-right p-2">Amount</th>
-                <th className="text-left p-2">Date</th>
-                <th className="text-left p-2">Description</th>
-                <th className="p-2">Actions</th>
+                <th className="p-4 text-left font-semibold">Date</th>
+                <th className="p-4 text-left font-semibold">Category</th>
+                <th className="p-4 text-left font-semibold">Amount</th>
+                <th className="p-4 text-left font-semibold">Description</th>
+                <th className="p-4 text-left font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(exp => (
-                <tr key={exp.id} className={`border-b hover:bg-gray-50 ${selected.includes(exp.id) ? 'bg-purple-50' : ''}`}>
-                  <td className="p-2">
-                    <input type="checkbox" checked={selected.includes(exp.id)} onChange={() => handleSelectRow(exp.id)} />
-                  </td>
-                  <td className="p-2">{exp.account}</td>
-                  <td className="p-2">{exp.category}</td>
-                  <td className="p-2 text-right">{Number(exp.amount).toFixed(2)}</td>
-                  <td className="p-2">{exp.date}</td>
-                  <td className="p-2">{exp.description}</td>
-                  <td className="p-2 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(exp)}>Edit</button>
-                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(exp.id)}>Delete</button>
-                  </td>
+              {expenses.length === 0 ? (
+                <tr>
+                  <td className="p-6 text-center text-gray-400" colSpan={5}>No expenses found</td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={7} className="text-center p-4 text-gray-400">No expenses found.</td></tr>
+              ) : (
+                expenses.map((expense) => (
+                  <tr key={expense.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">{expense.date}</td>
+                    <td className="p-4">{expense.category}</td>
+                    <td className="p-4">{expense.amount}</td>
+                    <td className="p-4">{expense.description}</td>
+                    <td className="p-4 flex gap-2">
+                      <button className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit" onClick={() => openEdit(expense)}><FaEdit size={15} /></button>
+                      <button className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete" onClick={() => handleDelete(expense.id)}><FaTrash size={15} /></button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
         {selected.length > 0 && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-200 shadow-lg rounded-xl px-6 py-3 flex items-center gap-4 animate-fade-in">
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
             <span className="font-semibold text-gray-700">{selected.length} selected</span>
-            <button className="bg-black text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-900 transition" onClick={handleExportSelected}>Export Expenses</button>
-            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={() => setSelected([])}>Clear</button>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelected}>Export Expenses</button>
           </div>
         )}
         {/* Modal */}

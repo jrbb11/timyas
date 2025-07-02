@@ -1,6 +1,6 @@
 import AdminLayout from "../layouts/AdminLayout";
 import { useEffect, useState } from "react";
-import { FaShoppingCart, FaDollarSign, FaStore } from "react-icons/fa";
+import { FaShoppingCart, FaDollarSign, FaStore, FaSearch } from "react-icons/fa";
 import { purchasesService } from "../services/purchasesService";
 import { salesService } from "../services/salesService";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
@@ -20,6 +20,7 @@ const Dashboard = () => {
     const now = new Date();
     return `${now.getFullYear()}-05`;
   });
+  const [search, setSearch] = useState<string>('');
 
   // Add types for pieData and customerSales
   type PieDataType = { name: string; value: number; color: string };
@@ -225,102 +226,107 @@ const Dashboard = () => {
   ];
 
   return (
-    <AdminLayout title="Dashboard">
-      <div className="space-y-6">
-        {/* Date Filter UI */}
-        <div className="flex justify-end items-center gap-2 mb-2">
-          <div className="inline-flex rounded-md shadow-sm bg-gray-100">
-            {['day', 'week', 'month'].map(type => (
-              <button
-                key={type}
-                className={`px-3 py-1 rounded-l-md text-sm font-medium focus:outline-none transition-colors ${filterType === type ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-blue-100'}`}
-                onClick={() => setFilterType(type as 'day' | 'week' | 'month')}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </button>
+    <AdminLayout title="Dashboard" breadcrumb={<span>Dashboard</span>}>
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          {/* No search input needed for dashboard */}
+        </div>
+        <div className="space-y-6">
+          {/* Date Filter UI */}
+          <div className="flex justify-end items-center gap-2 mb-2">
+            <div className="inline-flex rounded-md shadow-sm bg-gray-100">
+              {['day', 'week', 'month'].map(type => (
+                <button
+                  key={type}
+                  className={`px-3 py-1 rounded-l-md text-sm font-medium focus:outline-none transition-colors ${filterType === type ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-blue-100'}`}
+                  onClick={() => setFilterType(type as 'day' | 'week' | 'month')}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </button>
+              ))}
+            </div>
+            {filterType === 'day' && (
+              <input
+                type="date"
+                className="border rounded px-2 py-1 text-sm"
+                value={filterValue}
+                onChange={e => setFilterValue(e.target.value)}
+              />
+            )}
+            {filterType === 'week' && (
+              <input
+                type="week"
+                className="border rounded px-2 py-1 text-sm"
+                value={filterValue}
+                onChange={e => setFilterValue(e.target.value)}
+              />
+            )}
+            {filterType === 'month' && (
+              <input
+                type="month"
+                className="border rounded px-2 py-1 text-sm"
+                value={filterValue}
+                onChange={e => setFilterValue(e.target.value)}
+              />
+            )}
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map(({ title, value, icon, trend, trendUp }) => (
+              <div key={title} className="bg-white shadow rounded-lg p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-sm text-gray-500">{icon} {title}</div>
+                <div className="text-2xl font-bold mt-1">{value}</div>
+                {trend && <div className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-500' : 'text-red-500'}`}>{trendUp ? '▲' : '▼'} {trend}</div>}
+              </div>
             ))}
           </div>
-          {filterType === 'day' && (
-            <input
-              type="date"
-              className="border rounded px-2 py-1 text-sm"
-              value={filterValue}
-              onChange={e => setFilterValue(e.target.value)}
-            />
-          )}
-          {filterType === 'week' && (
-            <input
-              type="week"
-              className="border rounded px-2 py-1 text-sm"
-              value={filterValue}
-              onChange={e => setFilterValue(e.target.value)}
-            />
-          )}
-          {filterType === 'month' && (
-            <input
-              type="month"
-              className="border rounded px-2 py-1 text-sm"
-              value={filterValue}
-              onChange={e => setFilterValue(e.target.value)}
-            />
-          )}
-        </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map(({ title, value, icon, trend, trendUp }) => (
-            <div key={title} className="bg-white shadow rounded-lg p-4 flex flex-col gap-2">
-              <div className="flex items-center gap-2 text-sm text-gray-500">{icon} {title}</div>
-              <div className="text-2xl font-bold mt-1">{value}</div>
-              {trend && <div className={`text-xs flex items-center gap-1 ${trendUp ? 'text-green-500' : 'text-red-500'}`}>{trendUp ? '▲' : '▼'} {trend}</div>}
-            </div>
-          ))}
-        </div>
-
-        {/* Product Sales Chart */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-4">Product sales</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <XAxis dataKey="date" fontSize={12} />
-                <YAxis fontSize={12} tickFormatter={value => `₱${Number(value).toLocaleString()}`} />
-                <Tooltip formatter={value => `₱${Number(value).toLocaleString()}`} />
-                <Legend />
-                <Bar dataKey="revenue" name="Sales" fill="#f59e42" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Sales by Category and Country */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white shadow rounded-lg p-6 flex flex-col">
-            <h2 className="text-lg font-semibold mb-4">Sales by product category</h2>
-            <div className="flex-1 flex flex-col items-center justify-center">
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                    {pieData.map((entry, idx) => (
-                      <Cell key={`cell-${idx}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Legend layout="vertical" align="right" verticalAlign="middle" />
-                </PieChart>
+          {/* Product Sales Chart */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-semibold mb-4">Product sales</h2>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="date" fontSize={12} />
+                  <YAxis fontSize={12} tickFormatter={value => `₱${Number(value).toLocaleString()}`} />
+                  <Tooltip formatter={value => `₱${Number(value).toLocaleString()}`} />
+                  <Legend />
+                  <Bar dataKey="revenue" name="Sales" fill="#f59e42" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
-          <div className="bg-white shadow rounded-lg p-6 flex flex-col lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-4">Sales by customers</h2>
-            <div className="flex flex-col gap-4 h-full">
-              <ul className="text-sm space-y-2 flex-1">
-                {customerSales.map((c) => (
-                  <li key={c.name} className="flex justify-between">
-                    <span className="font-medium">{c.name}</span>
-                    <span>{c.percent}%</span>
-                  </li>
-                ))}
-              </ul>
+
+          {/* Sales by Category and Country */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="bg-white shadow rounded-lg p-6 flex flex-col">
+              <h2 className="text-lg font-semibold mb-4">Sales by product category</h2>
+              <div className="flex-1 flex flex-col items-center justify-center">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
+                      {pieData.map((entry, idx) => (
+                        <Cell key={`cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Legend layout="vertical" align="right" verticalAlign="middle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="bg-white shadow rounded-lg p-6 flex flex-col lg:col-span-2">
+              <h2 className="text-lg font-semibold mb-4">Sales by customers</h2>
+              <div className="flex flex-col gap-4 h-full">
+                <ul className="text-sm space-y-2 flex-1">
+                  {customerSales.map((c) => (
+                    <li key={c.name} className="flex justify-between">
+                      <span className="font-medium">{c.name}</span>
+                      <span>{c.percent}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 
 const Transfers = () => {
   const [transfers, setTransfers] = useState<any[]>([]);
@@ -18,21 +18,21 @@ const Transfers = () => {
     accountsService.getAll().then(({ data }) => setAccounts(data || []));
   }, []);
 
-  const filtered = transfers.filter(t => t.from.toLowerCase().includes(search.toLowerCase()) || t.to.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase()));
+  const filtered: any[] = transfers.filter(t => t.from.toLowerCase().includes(search.toLowerCase()) || t.to.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase()));
 
   const openCreate = () => {
     setEditTransfer(null);
     setForm({ from: '', to: '', amount: '', date: '', description: '' });
     setModalOpen(true);
   };
-  const openEdit = (tr) => {
+  const openEdit = (tr: any) => {
     setEditTransfer(tr);
     setForm({ ...tr });
     setModalOpen(true);
   };
   const closeModal = () => setModalOpen(false);
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
-  const handleSubmit = e => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editTransfer) {
       setTransfers(transfers.map(t => t.id === editTransfer.id ? { ...form, id: editTransfer.id } : t));
@@ -41,7 +41,7 @@ const Transfers = () => {
     }
     setModalOpen(false);
   };
-  const handleDelete = id => setTransfers(transfers.filter(t => t.id !== id));
+  const handleDelete = (id: any) => setTransfers(transfers.filter((t: any) => t.id !== id));
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelected(filtered.map(t => t.id));
@@ -102,7 +102,7 @@ const Transfers = () => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(tr => (
+              {filtered.map((tr: any) => (
                 <tr key={tr.id} className={`border-b hover:bg-gray-50 ${selected.includes(tr.id) ? 'bg-purple-50' : ''}`}>
                   <td className="p-4">
                     <input type="checkbox" checked={selected.includes(tr.id)} onChange={() => handleSelectRow(tr.id)} />
@@ -113,8 +113,8 @@ const Transfers = () => {
                   <td className="p-4">{tr.date}</td>
                   <td className="p-4">{tr.description}</td>
                   <td className="p-4 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(tr)}>Edit</button>
-                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(tr.id)}>Delete</button>
+                    <button className="p-1 text-blue-600 hover:bg-blue-100 rounded" onClick={() => openEdit(tr)} title="Edit"><FaEdit size={15} /></button>
+                    <button className="p-1 text-red-600 hover:bg-red-100 rounded" onClick={() => handleDelete(tr.id)} title="Delete"><FaTrash size={15} /></button>
                   </td>
                 </tr>
               ))}
@@ -125,10 +125,9 @@ const Transfers = () => {
           </table>
         </div>
         {selected.length > 0 && (
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-200 shadow-lg rounded-xl px-6 py-3 flex items-center gap-4 animate-fade-in">
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
             <span className="font-semibold text-gray-700">{selected.length} selected</span>
-            <button className="bg-black text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-900 transition" onClick={handleExportSelected}>Export Transfers</button>
-            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={() => setSelected([])}>Clear</button>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelected}>Export Transfers</button>
           </div>
         )}
         {/* Modal */}
@@ -140,12 +139,14 @@ const Transfers = () => {
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">From</label>
                   <select name="from" value={form.from} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    <option value="">Select account...</option>
                     {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">To</label>
                   <select name="to" value={form.to} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
+                    <option value="">Select account...</option>
                     {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                   </select>
                 </div>

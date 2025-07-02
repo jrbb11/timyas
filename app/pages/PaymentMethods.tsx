@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 
 type MethodType = { id: number; name: string };
 
@@ -77,41 +77,38 @@ const PaymentMethods = () => {
               </span>
               <input
                 type="text"
-                placeholder="Search methods..."
+                placeholder="Search payment methods..."
                 className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
               />
             </div>
           </div>
-          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" type="button">+ Create</button>
         </div>
         <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="p-4 text-left font-semibold">
-                  <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={handleSelectAll} />
-                </th>
                 <th className="p-4 text-left font-semibold">Name</th>
-                <th className="p-4 font-semibold">Actions</th>
+                <th className="p-4 text-left font-semibold">Description</th>
+                <th className="p-4 text-left font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(m => (
-                <tr key={m.id} className={`border-b hover:bg-gray-50 ${selected.includes(m.id) ? 'bg-purple-50' : ''}`}>
-                  <td className="p-4">
-                    <input type="checkbox" checked={selected.includes(m.id)} onChange={() => handleSelectRow(m.id)} />
-                  </td>
-                  <td className="p-4">{m.name}</td>
-                  <td className="p-4 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => openEdit(m)}>Edit</button>
-                    <button className="text-red-600 hover:underline" onClick={() => handleDelete(m.id)}>Delete</button>
-                  </td>
+              {methods.length === 0 ? (
+                <tr>
+                  <td className="p-6 text-center text-gray-400" colSpan={3}>No payment methods found</td>
                 </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={3} className="text-center p-6 text-gray-400">No payment methods found.</td></tr>
+              ) : (
+                methods.map((method) => (
+                  <tr key={method.id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">{method.name}</td>
+                    <td className="p-4">{method.description}</td>
+                    <td className="p-4 flex gap-2">
+                      <button className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Edit"><FaEdit size={15} /></button>
+                      <button className="p-1 text-red-600 hover:bg-red-100 rounded" title="Delete"><FaTrash size={15} /></button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>

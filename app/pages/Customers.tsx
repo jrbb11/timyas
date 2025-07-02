@@ -1,7 +1,7 @@
 import AdminLayout from '../layouts/AdminLayout';
 import { useEffect, useState } from 'react';
 import { customersService } from '../services/customersService';
-import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import Modal from '../components/ui/Modal';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
@@ -38,6 +38,7 @@ const Customers = () => {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<string[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -214,6 +215,10 @@ const Customers = () => {
     doc.save('customers.pdf');
   };
 
+  const handleExportSelected = () => {
+    // Implementation of handleExportSelected function
+  };
+
   // Toast auto-dismiss
   useEffect(() => {
     if (toast) {
@@ -227,81 +232,58 @@ const Customers = () => {
       title="Customers"
       breadcrumb={<span>People &gt; <span className="text-gray-900">Customers</span></span>}
     >
-      <div className="py-6 px-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search customers..."
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search customers..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={handleOpenCreate} type="button">Create</button>
-            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
-            <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
-            <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
-          </div>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={handleOpenCreate} type="button">+ Create</button>
         </div>
-        <div className="overflow-x-auto bg-white rounded-lg shadow">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">Loading...</div>
-          ) : error ? (
-            <div className="p-8 text-center text-red-500">{error}</div>
-          ) : (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
-                  <th className="p-3 text-left font-semibold">Name</th>
-                  <th className="p-3 text-left font-semibold">Email</th>
-                  <th className="p-3 text-left font-semibold">Phone</th>
-                  <th className="p-3 text-left font-semibold">Address</th>
-                  <th className="p-3 text-center font-semibold" style={{ width: '110px' }}>Action</th>
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="p-4 text-left font-semibold">Name</th>
+                <th className="p-4 text-left font-semibold">Email</th>
+                <th className="p-4 text-left font-semibold">Phone</th>
+                <th className="p-4 text-left font-semibold">Address</th>
+                <th className="p-4 text-left font-semibold">City</th>
+                <th className="p-4 text-left font-semibold">Country</th>
+                <th className="p-4 font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedCustomers.map(customer => (
+                <tr key={customer.id} className="border-b hover:bg-gray-50">
+                  <td className="p-4">{customer.name}</td>
+                  <td className="p-4">{customer.email}</td>
+                  <td className="p-4">{customer.phone}</td>
+                  <td className="p-4">{customer.address}</td>
+                  <td className="p-4">{customer.city}</td>
+                  <td className="p-4">{customer.country}</td>
+                  <td className="p-4 flex gap-2">
+                    <button className="text-blue-600 hover:underline" onClick={() => handleView(customer)}><FaEye /></button>
+                    <button className="text-yellow-600 hover:underline" onClick={() => handleEdit(customer)}><FaEdit /></button>
+                    <button className="text-red-600 hover:underline" onClick={() => { setCustomerToDelete(customer); setShowDeleteConfirm(true); }}><FaTrash /></button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {paginatedCustomers.map((customer) => (
-                  <tr key={customer.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3"><input type="checkbox" /></td>
-                    <td className="p-3 font-medium">{customer.name}</td>
-                    <td className="p-3">{customer.email}</td>
-                    <td className="p-3">{customer.phone}</td>
-                    <td className="p-3">{customer.address}</td>
-                    <td className="p-3" style={{ minWidth: '110px', height: '100%' }}>
-                      <div className="flex gap-2 items-center justify-center h-full">
-                        <button
-                          className="text-blue-600 hover:text-blue-800"
-                          onClick={() => handleView(customer)}
-                          title="View"
-                        >
-                          <FaEye />
-                        </button>
-                        <button
-                          className="text-green-600 hover:text-green-800"
-                          onClick={() => handleEdit(customer)}
-                          title="Edit"
-                          disabled={loadingAction}
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          className="text-red-600 hover:text-red-800"
-                          onClick={() => { setCustomerToDelete(customer); setShowDeleteConfirm(true); }}
-                          title="Delete"
-                          disabled={loadingAction}
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+              ))}
+              {paginatedCustomers.length === 0 && (
+                <tr><td colSpan={7} className="text-center p-6 text-gray-400">No customers found.</td></tr>
+              )}
+            </tbody>
+          </table>
         </div>
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
@@ -479,6 +461,12 @@ const Customers = () => {
         {toast && (
           <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
             {toast.message}
+          </div>
+        )}
+        {selected.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelected}>Export Customers</button>
           </div>
         )}
       </div>

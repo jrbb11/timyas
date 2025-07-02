@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { stockMovementService } from '../services/stockMovementService';
 import { productsService } from '../services/productsService';
 import { warehousesService } from '../services/warehousesService';
+import { FaSearch } from 'react-icons/fa';
 
 const StockMovementHistory = () => {
   const [movements, setMovements] = useState<any[]>([]);
@@ -164,79 +165,87 @@ const StockMovementHistory = () => {
       title="Stock Movement History"
       breadcrumb={<span>Products &gt; <span className="text-gray-900">Stock Movement History</span></span>}
     >
-      <div className="py-6 px-4">
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+      <div className="p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search movements..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
           </div>
-        )}
-
+          {/* Add action buttons here if needed */}
+        </div>
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Filters</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Product</label>
-                <select
-                  className="w-full border rounded px-3 py-2"
-                  value={selectedProduct}
-                  onChange={e => setSelectedProduct(e.target.value)}
-                >
-                  <option value="">All Products</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} ({product.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Warehouse</label>
-                <select
-                  className="w-full border rounded px-3 py-2"
-                  value={selectedWarehouse}
-                  onChange={e => setSelectedWarehouse(e.target.value)}
-                >
-                  <option value="">All Warehouses</option>
-                  {warehouses.map((warehouse) => (
-                    <option key={warehouse.id} value={warehouse.id}>
-                      {warehouse.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Movement Type</label>
-                <select
-                  className="w-full border rounded px-3 py-2"
-                  value={movementType}
-                  onChange={e => setMovementType(e.target.value)}
-                >
-                  <option value="all">All Movements</option>
-                  <option value="purchases">Purchases Only</option>
-                  <option value="sales">Sales Only</option>
-                  <option value="adjustments">Adjustments Only</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Date Range</label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    className="flex-1 border rounded px-3 py-2"
-                    value={dateFrom}
-                    onChange={e => setDateFrom(e.target.value)}
-                    placeholder="From"
-                  />
-                  <input
-                    type="date"
-                    className="flex-1 border rounded px-3 py-2"
-                    value={dateTo}
-                    onChange={e => setDateTo(e.target.value)}
-                    placeholder="To"
-                  />
-                </div>
+        <div className="bg-white rounded-xl shadow p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Product</label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={selectedProduct}
+                onChange={e => setSelectedProduct(e.target.value)}
+              >
+                <option value="">All Products</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} ({product.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Warehouse</label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={selectedWarehouse}
+                onChange={e => setSelectedWarehouse(e.target.value)}
+              >
+                <option value="">All Warehouses</option>
+                {warehouses.map((warehouse) => (
+                  <option key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Movement Type</label>
+              <select
+                className="w-full border rounded px-3 py-2"
+                value={movementType}
+                onChange={e => setMovementType(e.target.value)}
+              >
+                <option value="all">All Movements</option>
+                <option value="purchases">Purchases Only</option>
+                <option value="sales">Sales Only</option>
+                <option value="adjustments">Adjustments Only</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Date Range</label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  className="flex-1 border rounded px-3 py-2"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  placeholder="From"
+                />
+                <input
+                  type="date"
+                  className="flex-1 border rounded px-3 py-2"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  placeholder="To"
+                />
               </div>
             </div>
           </div>
