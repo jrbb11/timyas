@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
+import { FaSearch } from 'react-icons/fa';
 
 const Transfers = () => {
   const [transfers, setTransfers] = useState<any[]>([]);
@@ -10,6 +11,7 @@ const Transfers = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTransfer, setEditTransfer] = useState(null);
   const [form, setForm] = useState<any>({ from: '', to: '', amount: '', date: '', description: '' });
+  const [selected, setSelected] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.from('transfers').select('*').then(({ data }) => setTransfers(data || []));
@@ -40,52 +42,95 @@ const Transfers = () => {
     setModalOpen(false);
   };
   const handleDelete = id => setTransfers(transfers.filter(t => t.id !== id));
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(filtered.map(t => t.id));
+    } else {
+      setSelected([]);
+    }
+  };
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+  const handleExportSelected = () => {
+    const selectedTransfers = transfers.filter(t => selected.includes(t.id));
+    const csv = selectedTransfers.map(({ id, from, to, amount, date, description }) => ({ id, from, to, amount, date, description }));
+    const csvString = [Object.keys(csv[0]).join(','), ...csv.map(row => Object.values(row).join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_transfers.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <AdminLayout title="Transfers" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Transfers</span></span>}>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Transfers</h1>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={openCreate}>Create</button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search transfers..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
         </div>
-        <input
-          className="mb-4 p-2 border rounded w-full max-w-xs"
-          placeholder="Search transfers..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-2">From</th>
-                <th className="text-left p-2">To</th>
-                <th className="text-right p-2">Amount</th>
-                <th className="text-left p-2">Date</th>
-                <th className="text-left p-2">Description</th>
-                <th className="p-2">Actions</th>
+                <th className="p-4 text-left font-semibold">
+                  <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={handleSelectAll} />
+                </th>
+                <th className="p-4 text-left font-semibold">From</th>
+                <th className="p-4 text-left font-semibold">To</th>
+                <th className="p-4 text-right font-semibold">Amount</th>
+                <th className="p-4 text-left font-semibold">Date</th>
+                <th className="p-4 text-left font-semibold">Description</th>
+                <th className="p-4 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(tr => (
-                <tr key={tr.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{tr.from}</td>
-                  <td className="p-2">{tr.to}</td>
-                  <td className="p-2 text-right">{Number(tr.amount).toFixed(2)}</td>
-                  <td className="p-2">{tr.date}</td>
-                  <td className="p-2">{tr.description}</td>
-                  <td className="p-2 flex gap-2">
+                <tr key={tr.id} className={`border-b hover:bg-gray-50 ${selected.includes(tr.id) ? 'bg-purple-50' : ''}`}>
+                  <td className="p-4">
+                    <input type="checkbox" checked={selected.includes(tr.id)} onChange={() => handleSelectRow(tr.id)} />
+                  </td>
+                  <td className="p-4">{tr.from}</td>
+                  <td className="p-4">{tr.to}</td>
+                  <td className="p-4 text-right">{Number(tr.amount).toFixed(2)}</td>
+                  <td className="p-4">{tr.date}</td>
+                  <td className="p-4">{tr.description}</td>
+                  <td className="p-4 flex gap-2">
                     <button className="text-blue-600 hover:underline" onClick={() => openEdit(tr)}>Edit</button>
                     <button className="text-red-600 hover:underline" onClick={() => handleDelete(tr.id)}>Delete</button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center p-4 text-gray-400">No transfers found.</td></tr>
+                <tr><td colSpan={7} className="text-center p-6 text-gray-400">No transfers found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        {selected.length > 0 && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-200 shadow-lg rounded-xl px-6 py-3 flex items-center gap-4 animate-fade-in">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="bg-black text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-900 transition" onClick={handleExportSelected}>Export Transfers</button>
+            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={() => setSelected([])}>Clear</button>
+          </div>
+        )}
         {/* Modal */}
         {modalOpen && (
           <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">

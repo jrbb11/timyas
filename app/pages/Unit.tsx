@@ -1,5 +1,5 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../components/ui/Modal';
 import { supabase } from '../utils/supabaseClient';
@@ -28,6 +28,7 @@ const Unit = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [selected, setSelected] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -134,6 +135,32 @@ const Unit = () => {
     setLoading(false);
   };
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(paginatedUnits.map(u => u.id));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  const handleExportSelectedUnits = () => {
+    const selectedUnits = units.filter(u => selected.includes(u.id));
+    const csv = selectedUnits.map(({ id, name, short_name, base_unit, operator, operation_value, created_at }) => ({ id, name, short_name, base_unit, operator, operation_value, created_at }));
+    const csvString = [Object.keys(csv[0]).join(','), ...csv.map(row => Object.values(row).join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_units.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredUnits = units.filter(unit =>
     unit.name.toLowerCase().includes(search.toLowerCase()) ||
     unit.short_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -156,29 +183,39 @@ const Unit = () => {
         {error && <div className="mb-4 text-red-600">{error}</div>}
         {loading && <div className="mb-4 text-gray-600 flex items-center gap-2"><svg className="animate-spin h-5 w-5 text-gray-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Loading...</div>}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search units..."
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              disabled={loading}
-            />
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search units..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ boxShadow: 'none' }}
+                disabled={loading}
+              />
+            </div>
           </div>
           <button
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
+            style={{minWidth: 120}}
             onClick={handleCreate}
             disabled={loading}
+            type="button"
           >
-            Create
+            + Create
           </button>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
+                <th className="p-3 text-left font-semibold">
+                  <input type="checkbox" checked={selected.length === paginatedUnits.length && paginatedUnits.length > 0} onChange={handleSelectAll} />
+                </th>
                 <th className="p-3 text-left font-semibold">Name</th>
                 <th className="p-3 text-left font-semibold">Short Name</th>
                 <th className="p-3 text-left font-semibold">Base Unit</th>
@@ -189,8 +226,10 @@ const Unit = () => {
             </thead>
             <tbody>
               {paginatedUnits.map((unit) => (
-                <tr key={unit.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3"><input type="checkbox" /></td>
+                <tr key={unit.id} className={`border-b hover:bg-gray-50 ${selected.includes(unit.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="p-3">
+                    <input type="checkbox" checked={selected.includes(unit.id)} onChange={() => handleSelectRow(unit.id)} />
+                  </td>
                   <td className="p-3">{unit.name}</td>
                   <td className="p-3">{unit.short_name}</td>
                   <td className="p-3">{unit.base_unit}</td>
@@ -353,6 +392,12 @@ const Unit = () => {
         {toast && (
           <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
             {toast.message}
+          </div>
+        )}
+        {selected.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelectedUnits}>Export Units</button>
           </div>
         )}
       </div>

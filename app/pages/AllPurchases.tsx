@@ -1,3 +1,6 @@
+// @ts-ignore
+// eslint-disable-next-line
+declare module 'react-date-range';
 import AdminLayout from '../layouts/AdminLayout';
 import { useEffect, useState, useRef } from 'react';
 import { purchasesService } from '../services/purchasesService';
@@ -34,8 +37,7 @@ const AllPurchases = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const navigate = useNavigate();
-  const [sortBy, setSortBy] = useState('date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [selected, setSelected] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<any>([
     {
@@ -96,24 +98,33 @@ const AllPurchases = () => {
     return matchesSearch && matchesDate;
   });
 
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortDirection('asc');
-    }
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
   };
 
-  const sortedPurchases = [...filteredPurchases].sort((a, b) => {
-    let aValue = a[sortBy];
-    let bValue = b[sortBy];
-    if (sortBy === 'total_amount') {
+  const sortedPurchases = [...purchases].sort((a, b) => {
+    const { key, direction } = sortConfig;
+    let aValue = a[key];
+    let bValue = b[key];
+    if (key === 'supplier_name') {
+      aValue = aValue?.toLowerCase() || '';
+      bValue = bValue?.toLowerCase() || '';
+    }
+    if (key === 'total_amount') {
       aValue = Number(aValue);
       bValue = Number(bValue);
     }
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    if (key === 'date') {
+      aValue = new Date(aValue).getTime();
+      bValue = new Date(bValue).getTime();
+    }
+    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
     return 0;
   });
 
@@ -237,7 +248,7 @@ const AllPurchases = () => {
                   <div className="absolute z-50 mt-2 bg-white rounded shadow-lg p-2">
                     <DateRange
                       editableDateInputs={true}
-                      onChange={item => setDateRange([item.selection])}
+                      onChange={(item: any) => setDateRange([item.selection])}
                       moveRangeOnFirstSelection={false}
                       ranges={dateRange}
                       maxDate={new Date()}
@@ -270,12 +281,18 @@ const AllPurchases = () => {
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b text-gray-700 text-base">
                     <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === paginatedPurchases.length && paginatedPurchases.length > 0} onChange={handleSelectAll} /></th>
-                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('date')}>Date {sortBy === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('date')}>
+                      Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-4 text-left font-semibold">Reference</th>
-                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('supplier_name')}>Supplier {sortBy === 'supplier_name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('supplier_name')}>
+                      Supplier {sortConfig.key === 'supplier_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-4 text-left font-semibold">Warehouse</th>
-                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('status')}>Status {sortBy === 'status' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
-                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('total_amount')}>Grand Total {sortBy === 'total_amount' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('status')}>Status {sortConfig.key === 'status' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                    <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('total_amount')}>
+                      Grand Total {sortConfig.key === 'total_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="p-4 text-center font-semibold">Action</th>
                   </tr>
                 </thead>

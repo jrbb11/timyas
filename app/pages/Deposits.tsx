@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
+import { FaSearch } from 'react-icons/fa';
 
 type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
@@ -48,44 +49,51 @@ const Deposits = () => {
   return (
     <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Deposits</h1>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={openCreate}>Create</button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search deposits..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
         </div>
-        <input
-          className="mb-4 p-2 border rounded w-full max-w-xs"
-          placeholder="Search deposits..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-2">Account</th>
-                <th className="text-left p-2">Category</th>
-                <th className="text-right p-2">Amount</th>
-                <th className="text-left p-2">Date</th>
-                <th className="text-left p-2">Description</th>
-                <th className="p-2">Actions</th>
+                <th className="p-4 text-left font-semibold">Account</th>
+                <th className="p-4 text-left font-semibold">Category</th>
+                <th className="p-4 text-right font-semibold">Amount</th>
+                <th className="p-4 text-left font-semibold">Date</th>
+                <th className="p-4 text-left font-semibold">Description</th>
+                <th className="p-4 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(dep => (
                 <tr key={dep.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{dep.account}</td>
-                  <td className="p-2">{dep.category}</td>
-                  <td className="p-2 text-right">{Number(dep.amount).toFixed(2)}</td>
-                  <td className="p-2">{dep.date}</td>
-                  <td className="p-2">{dep.description}</td>
-                  <td className="p-2 flex gap-2">
+                  <td className="p-4">{dep.account}</td>
+                  <td className="p-4">{dep.category}</td>
+                  <td className="p-4 text-right">{Number(dep.amount).toFixed(2)}</td>
+                  <td className="p-4">{dep.date}</td>
+                  <td className="p-4">{dep.description}</td>
+                  <td className="p-4 flex gap-2">
                     <button className="text-blue-600 hover:underline" onClick={() => openEdit(dep)}>Edit</button>
                     <button className="text-red-600 hover:underline" onClick={() => handleDelete(dep.id)}>Delete</button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center p-4 text-gray-400">No deposits found.</td></tr>
+                <tr><td colSpan={6} className="text-center p-6 text-gray-400">No deposits found.</td></tr>
               )}
             </tbody>
           </table>

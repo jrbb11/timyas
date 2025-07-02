@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
+import { FaSearch } from 'react-icons/fa';
 
 type AccountType = { id: number; name: string; type: string; balance: number };
 
@@ -43,40 +44,47 @@ const Accounts = () => {
   return (
     <AdminLayout title="Accounts" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Accounts</span></span>}>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Accounts</h1>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={openCreate}>Create</button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search accounts..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
         </div>
-        <input
-          className="mb-4 p-2 border rounded w-full max-w-xs"
-          placeholder="Search accounts..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-2">Name</th>
-                <th className="text-left p-2">Type</th>
-                <th className="text-right p-2">Balance</th>
-                <th className="p-2">Actions</th>
+                <th className="p-4 text-left font-semibold">Name</th>
+                <th className="p-4 text-left font-semibold">Type</th>
+                <th className="p-4 text-right font-semibold">Balance</th>
+                <th className="p-4 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(acc => (
                 <tr key={acc.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{acc.name}</td>
-                  <td className="p-2">{acc.type}</td>
-                  <td className="p-2 text-right">{acc.balance.toFixed(2)}</td>
-                  <td className="p-2 flex gap-2">
+                  <td className="p-4">{acc.name}</td>
+                  <td className="p-4">{acc.type}</td>
+                  <td className="p-4 text-right">{acc.balance.toFixed(2)}</td>
+                  <td className="p-4 flex gap-2">
                     <button className="text-blue-600 hover:underline" onClick={() => openEdit(acc)}>Edit</button>
                     <button className="text-red-600 hover:underline" onClick={() => handleDelete(acc.id)}>Delete</button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={4} className="text-center p-4 text-gray-400">No accounts found.</td></tr>
+                <tr><td colSpan={4} className="text-center p-6 text-gray-400">No accounts found.</td></tr>
               )}
             </tbody>
           </table>

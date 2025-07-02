@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AdminLayout from '../layouts/AdminLayout';
+import { FaSearch } from 'react-icons/fa';
 
 type MethodType = { id: number; name: string };
 
@@ -15,6 +16,7 @@ const PaymentMethods = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editMethod, setEditMethod] = useState<MethodType | null>(null);
   const [form, setForm] = useState({ name: '' });
+  const [selected, setSelected] = useState<any[]>([]);
 
   const filtered = methods.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -40,44 +42,87 @@ const PaymentMethods = () => {
     setModalOpen(false);
   };
   const handleDelete = (id: number) => setMethods(methods.filter(m => m.id !== id));
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(filtered.map(m => m.id));
+    } else {
+      setSelected([]);
+    }
+  };
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+  const handleExportSelected = () => {
+    const selectedMethods = methods.filter(m => selected.includes(m.id));
+    const csv = selectedMethods.map(({ id, name }) => ({ id, name }));
+    const csvString = [Object.keys(csv[0]).join(','), ...csv.map(row => Object.values(row).join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_payment_methods.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <AdminLayout title="Payment Methods" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Payment Methods</span></span>}>
       <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">Payment Methods</h1>
-          <button className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700" onClick={openCreate}>Create</button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search methods..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
         </div>
-        <input
-          className="mb-4 p-2 border rounded w-full max-w-xs"
-          placeholder="Search methods..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="bg-white rounded shadow p-4 overflow-x-auto">
+        <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-2">Name</th>
-                <th className="p-2">Actions</th>
+                <th className="p-4 text-left font-semibold">
+                  <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={handleSelectAll} />
+                </th>
+                <th className="p-4 text-left font-semibold">Name</th>
+                <th className="p-4 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(m => (
-                <tr key={m.id} className="border-b hover:bg-gray-50">
-                  <td className="p-2">{m.name}</td>
-                  <td className="p-2 flex gap-2">
+                <tr key={m.id} className={`border-b hover:bg-gray-50 ${selected.includes(m.id) ? 'bg-purple-50' : ''}`}>
+                  <td className="p-4">
+                    <input type="checkbox" checked={selected.includes(m.id)} onChange={() => handleSelectRow(m.id)} />
+                  </td>
+                  <td className="p-4">{m.name}</td>
+                  <td className="p-4 flex gap-2">
                     <button className="text-blue-600 hover:underline" onClick={() => openEdit(m)}>Edit</button>
                     <button className="text-red-600 hover:underline" onClick={() => handleDelete(m.id)}>Delete</button>
                   </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={2} className="text-center p-4 text-gray-400">No payment methods found.</td></tr>
+                <tr><td colSpan={3} className="text-center p-6 text-gray-400">No payment methods found.</td></tr>
               )}
             </tbody>
           </table>
         </div>
+        {selected.length > 0 && (
+          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white border border-gray-200 shadow-lg rounded-xl px-6 py-3 flex items-center gap-4 animate-fade-in">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="bg-black text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-900 transition" onClick={handleExportSelected}>Export Methods</button>
+            <button className="ml-2 text-gray-500 hover:text-red-500" onClick={() => setSelected([])}>Clear</button>
+          </div>
+        )}
         {/* Modal */}
         {modalOpen && (
           <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">

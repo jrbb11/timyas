@@ -1,5 +1,5 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { productsService } from '../services/productsService';
 import jsPDF from 'jspdf';
@@ -29,6 +29,8 @@ const AllProducts = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+  const [selected, setSelected] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -55,7 +57,33 @@ const AllProducts = () => {
     fetchProducts();
   }, []);
 
-  const filteredProducts = products.filter((product) => {
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedProducts = [...products].sort((a, b) => {
+    const { key, direction } = sortConfig;
+    let aValue = a[key];
+    let bValue = b[key];
+    if (["name", "code", "brand", "category", "type", "product_unit"].includes(key)) {
+      aValue = (aValue?.name || aValue || '').toString().toLowerCase();
+      bValue = (bValue?.name || bValue || '').toString().toLowerCase();
+    }
+    if (["product_cost", "product_price", "quantity"].includes(key)) {
+      aValue = Number(aValue);
+      bValue = Number(bValue);
+    }
+    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const filteredProducts = sortedProducts.filter((product) => {
     const searchTerm = search.toLowerCase();
     return (
       product.name?.toLowerCase().includes(searchTerm) ||
@@ -177,6 +205,31 @@ const AllProducts = () => {
     }
   }, [toast]);
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(paginatedProducts.map(p => p.id));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  const handleExportSelectedProducts = () => {
+    const selectedProducts = products.filter(p => selected.includes(p.id));
+    const csv = Papa.unparse(selectedProducts.map(({ id, name, code, brand, category, product_price, product_cost, stock_alert, created_at }) => ({ id, name, code, brand: brand?.name || '', category: category?.name || '', product_price, product_cost, stock_alert, created_at })));
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_products.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <AdminLayout
       title="All Products"
@@ -184,32 +237,28 @@ const AllProducts = () => {
     >
       <div className="py-6 px-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search this table"
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search for products"
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ boxShadow: 'none' }}
+              />
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button className="border px-4 py-2 rounded text-gray-700 hover:bg-gray-50">Filter</button>
-            <button className="border px-4 py-2 rounded text-green-600 border-green-400 hover:bg-green-50" onClick={handleExportPDF} type="button">PDF</button>
-            <button className="border px-4 py-2 rounded text-red-600 border-red-400 hover:bg-red-50" onClick={handleExportExcel} type="button">EXCEL</button>
-            <button className="border px-4 py-2 rounded text-blue-600 border-blue-400 hover:bg-blue-50" onClick={handleImportClick} type="button">Import products</button>
-            <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={handleExportCSV} type="button">Export CSV</button>
+          <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
+            <button className="border border-blue-400 text-blue-600 px-4 py-2 rounded hover:bg-blue-50" onClick={handleImportClick} type="button">Import products</button>
+            <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Products</button>
+            <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/products/create')} type="button">+ Create</button>
             <input type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" ref={fileInputRef} onChange={handleImportFile} className="hidden" />
             {importing && <span className="ml-2 text-blue-500">Importing...</span>}
             {importMessage && <span className="ml-2 text-sm text-green-600">{importMessage}</span>}
-            <button
-              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-              onClick={() => navigate('/products/create')}
-              type="button"
-              disabled={loadingAction}
-            >
-              Create
-            </button>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -221,24 +270,28 @@ const AllProducts = () => {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="border-b">
-                  <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
+                  <th className="p-3 text-left font-semibold">
+                    <input type="checkbox" checked={selected.length === paginatedProducts.length && paginatedProducts.length > 0} onChange={handleSelectAll} />
+                  </th>
                   <th className="p-3 text-left font-semibold">Image</th>
-                  <th className="p-3 text-left font-semibold">Type</th>
-                  <th className="p-3 text-left font-semibold">Name</th>
-                  <th className="p-3 text-left font-semibold">Code</th>
-                  <th className="p-3 text-left font-semibold">Brand</th>
-                  <th className="p-3 text-left font-semibold">Category</th>
-                  <th className="p-3 text-left font-semibold">Cost</th>
-                  <th className="p-3 text-left font-semibold">Price</th>
-                  <th className="p-3 text-left font-semibold">Unit</th>
-                  <th className="p-3 text-left font-semibold">Quantity</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('type')}>Type {sortConfig.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('code')}>Code {sortConfig.key === 'code' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('brand')}>Brand {sortConfig.key === 'brand' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('category')}>Category {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('product_cost')}>Cost {sortConfig.key === 'product_cost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('product_price')}>Price {sortConfig.key === 'product_price' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('product_unit')}>Unit {sortConfig.key === 'product_unit' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                  <th className="p-3 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('quantity')}>Quantity {sortConfig.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
                   <th className="p-3 text-center font-semibold" style={{ width: '110px' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedProducts.map((product) => (
-                  <tr key={product.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3"><input type="checkbox" /></td>
+                  <tr key={product.id} className={`border-b hover:bg-gray-50 ${selected.includes(product.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="p-3">
+                      <input type="checkbox" checked={selected.includes(product.id)} onChange={() => handleSelectRow(product.id)} />
+                    </td>
                     <td className="p-3">
                       <div className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center">
                         {/* Placeholder for image */}
@@ -382,6 +435,12 @@ const AllProducts = () => {
       {toast && (
         <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
           {toast.message}
+        </div>
+      )}
+      {selected.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+          <span className="font-semibold text-gray-700">{selected.length} selected</span>
+          <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelectedProducts}>Export Products</button>
         </div>
       )}
     </AdminLayout>

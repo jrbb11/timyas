@@ -1,5 +1,5 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { FaEdit, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../components/ui/Modal';
 import { categoriesService } from '../services/categoriesService';
@@ -20,6 +20,7 @@ const Category = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [selected, setSelected] = useState<any[]>([]);
 
   // Fetch categories from Supabase
   useEffect(() => {
@@ -129,6 +130,32 @@ const Category = () => {
     currentPage * rowsPerPage + rowsPerPage
   );
 
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelected(paginatedCategories.map(c => c.id));
+    } else {
+      setSelected([]);
+    }
+  };
+
+  const handleSelectRow = (id: any) => {
+    setSelected(selected.includes(id) ? selected.filter(s => s !== id) : [...selected, id]);
+  };
+
+  const handleExportSelectedCategories = () => {
+    const selectedCategories = categories.filter(c => selected.includes(c.id));
+    const csv = selectedCategories.map(({ id, name, description, created_at }) => ({ id, name, description, created_at }));
+    const csvString = [Object.keys(csv[0]).join(','), ...csv.map(row => Object.values(row).join(','))].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'selected_categories.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <AdminLayout
       title="Category"
@@ -136,29 +163,39 @@ const Category = () => {
     >
       <div className="py-6 px-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search categories..."
-              className="border rounded px-3 py-2 w-full max-w-xs"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              disabled={loading}
-            />
+          <div className="flex-1 flex gap-2 items-center">
+            <div className="relative w-full max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <FaSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Search categories..."
+                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ boxShadow: 'none' }}
+                disabled={loading}
+              />
+            </div>
           </div>
           <button
-            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
+            style={{minWidth: 120}}
             onClick={handleCreate}
             disabled={loading}
+            type="button"
           >
-            Create
+            + Create
           </button>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="p-3 text-left font-semibold"><input type="checkbox" /></th>
+                <th className="p-3 text-left font-semibold">
+                  <input type="checkbox" checked={selected.length === paginatedCategories.length && paginatedCategories.length > 0} onChange={handleSelectAll} />
+                </th>
                 <th className="p-3 text-left font-semibold">Category Name</th>
                 <th className="p-3 text-left font-semibold">Description</th>
                 <th className="p-3 text-left font-semibold">Action</th>
@@ -166,8 +203,10 @@ const Category = () => {
             </thead>
             <tbody>
               {paginatedCategories.map((cat) => (
-                <tr key={cat.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3"><input type="checkbox" /></td>
+                <tr key={cat.id} className={`border-b hover:bg-gray-50 ${selected.includes(cat.id) ? 'bg-blue-50' : ''}`}>
+                  <td className="p-3">
+                    <input type="checkbox" checked={selected.includes(cat.id)} onChange={() => handleSelectRow(cat.id)} />
+                  </td>
                   <td className="p-3">{cat.name}</td>
                   <td className="p-3">{cat.description || ''}</td>
                   <td className="p-3 flex gap-2">
@@ -293,6 +332,12 @@ const Category = () => {
         {toast && (
           <div className={`fixed top-6 right-6 z-50 px-4 py-2 rounded shadow-lg text-white transition-all ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
             {toast.message}
+          </div>
+        )}
+        {selected.length > 0 && (
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white shadow-lg rounded-full px-6 py-3 flex gap-4 items-center border z-50">
+            <span className="font-semibold text-gray-700">{selected.length} selected</span>
+            <button className="text-gray-700 hover:text-gray-900 font-semibold" onClick={handleExportSelectedCategories}>Export Categories</button>
           </div>
         )}
       </div>

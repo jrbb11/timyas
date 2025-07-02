@@ -46,6 +46,7 @@ const AllSales = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
   useEffect(() => {
     setLoading(true);
@@ -80,7 +81,37 @@ const AllSales = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDatePicker]);
 
-  const filteredSales = sales.filter((sale) => {
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedSales = [...sales].sort((a, b) => {
+    const { key, direction } = sortConfig;
+    let aValue = a[key];
+    let bValue = b[key];
+    if (key === 'customer_name') {
+      aValue = aValue?.toLowerCase() || '';
+      bValue = bValue?.toLowerCase() || '';
+    }
+    if (key === 'total_amount') {
+      aValue = Number(aValue);
+      bValue = Number(bValue);
+    }
+    if (key === 'date') {
+      aValue = new Date(aValue).getTime();
+      bValue = new Date(bValue).getTime();
+    }
+    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const filteredSales = sortedSales.filter((sale) => {
     const searchTerm = search.toLowerCase();
     const matchesSearch =
       sale.reference?.toLowerCase().includes(searchTerm) ||
@@ -305,13 +336,19 @@ const AllSales = () => {
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b text-gray-700 text-base">
                   <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === paginatedSales.length && paginatedSales.length > 0} onChange={handleSelectAll} /></th>
-                  <th className="p-4 text-left font-semibold">Date</th>
+                  <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('date')}>
+                    Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="p-4 text-left font-semibold">Reference</th>
                   <th className="p-4 text-left font-semibold">Invoice</th>
-                  <th className="p-4 text-left font-semibold">Customer</th>
+                  <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('customer_name')}>
+                    Customer {sortConfig.key === 'customer_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="p-4 text-left font-semibold">Warehouse</th>
                   <th className="p-4 text-left font-semibold">Status</th>
-                  <th className="p-4 text-left font-semibold">Grand Total</th>
+                  <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('total_amount')}>
+                    Grand Total {sortConfig.key === 'total_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="p-4 text-left font-semibold">Paid</th>
                   <th className="p-4 text-left font-semibold">Due</th>
                   <th className="p-4 text-left font-semibold">Payment Status</th>
