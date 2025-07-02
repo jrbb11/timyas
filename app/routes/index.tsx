@@ -1,0 +1,4 @@
+{
+  path: '/reports',
+  element: <Reports />,
+}, 

@@ -74,6 +74,9 @@ export const Sidebar = () => {
             <Link to="/dashboard" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
               <FaChartBar /> Dashboard
             </Link>
+            <Link to="/reports" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
+              <FaChartBar /> Reports
+            </Link>
             {/* Products with submenu */}
             <div className="relative">
               <button

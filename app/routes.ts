@@ -33,4 +33,5 @@ export default [
   route("deposit-categories", "pages/DepositCategories.tsx"),
   route("expense-categories", "pages/ExpenseCategories.tsx"),
   route("taxes", "pages/Taxes.tsx"),
+  route("reports", "pages/Reports.tsx"),
 ] satisfies RouteConfig;
