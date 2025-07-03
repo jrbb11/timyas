@@ -487,3 +487,24 @@ create index if not exists audit_logs_entity_idx on public.audit_logs (entity);
 create index if not exists audit_logs_entity_id_idx on public.audit_logs (entity_id);
 create index if not exists audit_logs_user_id_idx on public.audit_logs (user_id);
 create index if not exists audit_logs_created_at_idx on public.audit_logs (created_at desc);
+
+-- App Users table for authentication-linked user profiles
+create table public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,
+  first_name text,
+  last_name text,
+  contact_number text,
+  created_at timestamptz not null default now(),
+  constraint app_users_user_id_unique unique (user_id)
+);
+
+-- User Roles table for RBAC
+create table public.user_roles (
+  id uuid primary key default gen_random_uuid(),
+  app_user_id uuid not null references app_users(id) on delete cascade,
+  role text not null, -- e.g., 'admin', 'manager', 'staff', 'franchisee'
+  created_at timestamptz not null default now(),
+  constraint user_roles_unique unique (app_user_id, role)
+);

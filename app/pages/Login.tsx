@@ -1,65 +1,137 @@
 import React, { useState } from 'react';
-import loginIllustration from '../assets/login-illustration.svg';
+import { supabase } from '../utils/supabaseClient';
+import { FaBuilding, FaMicroscope, FaClipboardList } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
+    setLoading(true);
+    setError(null);
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (loginError) {
+      setError(loginError.message);
+      setLoading(false);
+      return;
+    }
+    // Fetch user info and roles
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setError('User not found after login.');
+      setLoading(false);
+      return;
+    }
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('id, first_name, last_name, email')
+      .eq('user_id', user.id)
+      .single();
+    let welcomeName = appUser?.first_name || appUser?.email || 'User';
+    // Fetch roles
+    const { data: roles } = appUser ? await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('app_user_id', appUser.id) : { data: [] };
+    const userRoles = roles ? roles.map(r => r.role) : [];
+    // Show welcome message as toast
+    toast.success(`Welcome back, ${welcomeName}! Your roles: ${userRoles.join(', ')}`);
+    navigate('/dashboard');
+    setLoading(false);
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: 'linear-gradient(90deg, #19d3c5 50%, #f8f9fa 50%)' }}>
-      {/* Left: Illustration */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <img src={loginIllustration} alt="Login Illustration" style={{ maxWidth: 400, width: '100%' }} />
-      </div>
-      {/* Right: Login Card */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <form onSubmit={handleSubmit} style={{ background: '#fff', borderRadius: 20, boxShadow: '0 4px 32px rgba(0,0,0,0.08)', padding: 40, minWidth: 350, maxWidth: 400, width: '100%' }}>
-          <h2 style={{ fontWeight: 700, fontSize: 28, marginBottom: 24, textAlign: 'center', letterSpacing: 1 }}>LOGIN</h2>
-          <div style={{ marginBottom: 18 }}>
-            <input
-              type="text"
-              placeholder="Email or user name"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e0e0e0', fontSize: 16 }}
-              required
-            />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 to-blue-400">
+      <div className="w-full max-w-5xl bg-white rounded-2xl shadow-lg flex flex-col md:flex-row overflow-hidden">
+        {/* Left Panel */}
+        <div className="hidden md:flex flex-col justify-center items-start bg-blue-700 text-white p-10 w-1/2 relative">
+          <div className="mb-10">
+            <h2 className="text-2xl font-bold mb-2">Welcome back to Timyas Lechon Manok</h2>
+            <p className="text-blue-100">Modern franchisee & sales management for your business.</p>
           </div>
-          <div style={{ marginBottom: 10 }}>
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '12px 16px', borderRadius: 8, border: '1px solid #e0e0e0', fontSize: 16 }}
-              required
-            />
+          <div className="space-y-8">
+            <div className="flex items-start gap-4">
+              <span className="bg-blue-900 p-3 rounded-xl"><FaBuilding size={28} /></span>
+              <div>
+                <div className="font-semibold">Branch Management</div>
+                <div className="text-blue-100 text-sm">Easily manage all your branches and franchisees in one place.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <span className="bg-blue-900 p-3 rounded-xl"><FaMicroscope size={28} /></span>
+              <div>
+                <div className="font-semibold">Sales Analytics</div>
+                <div className="text-blue-100 text-sm">Track sales, payments, and dues with real-time dashboards.</div>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <span className="bg-blue-900 p-3 rounded-xl"><FaClipboardList size={28} /></span>
+              <div>
+                <div className="font-semibold">Inventory & Finance</div>
+                <div className="text-blue-100 text-sm">Stay on top of stock, expenses, and financials with ease.</div>
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14 }}>
+          <div className="absolute bottom-6 left-10 text-xs text-blue-200">&copy; {new Date().getFullYear()} Timyas Lechon Manok</div>
+        </div>
+        {/* Right Panel (Form) */}
+        <div className="flex-1 flex flex-col justify-center p-8 md:p-16">
+          <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto space-y-6">
+            <h2 className="text-2xl font-bold mb-2 text-gray-900">Login to <span className="text-blue-700">Timyas Lechon Manok</span></h2>
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
               <input
-                type="checkbox"
-                checked={remember}
-                onChange={e => setRemember(e.target.checked)}
-                style={{ marginRight: 8 }}
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300"
               />
-              Remember me
-            </label>
-            <a href="#" style={{ color: '#888', fontSize: 14, textDecoration: 'none' }}>Forgot Password</a>
-          </div>
-          <button
-            type="submit"
-            style={{ width: '100%', background: '#ff4081', color: '#fff', border: 'none', borderRadius: 8, padding: '12px 0', fontWeight: 600, fontSize: 18, boxShadow: '0 2px 8px rgba(255,64,129,0.08)', marginBottom: 12, cursor: 'pointer' }}
-          >
-            Login
-          </button>
-        </form>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Password</label>
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center text-sm">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={e => setRemember(e.target.checked)}
+                  className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                />
+                Remember me
+              </label>
+              <a href="#" className="text-blue-700 text-sm underline">Forgot Password?</a>
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-700 text-white py-2 rounded font-semibold hover:bg-blue-800 transition"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+            {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
+          </form>
+        </div>
       </div>
     </div>
   );

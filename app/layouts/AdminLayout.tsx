@@ -1,7 +1,7 @@
 // app/layouts/AdminLayout.tsx
 import type { PropsWithChildren, ReactNode } from 'react';
 
-import { Sidebar } from '../components/Sidebar';
+import Sidebar from '../components/Sidebar';
 import { Topbar } from '../components/Topbar';
 
 interface AdminLayoutProps extends PropsWithChildren {
