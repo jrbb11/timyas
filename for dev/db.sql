@@ -130,6 +130,41 @@ create table public.accounts (
     )
   ) TABLESPACE pg_default;
   
+  create table public.branches (
+    id uuid not null default gen_random_uuid (),
+    name text not null,
+    code text null,
+    address text null,
+    city text null,
+    country text null,
+    created_at timestamp without time zone null default now(),
+    constraint branches_pkey primary key (id),
+    constraint branches_code_key unique (code)
+  ) TABLESPACE pg_default;
+  
+  create table public.people_branches (
+    person_id uuid not null,
+    branch_id uuid not null,
+    assigned_at timestamp without time zone null default now(),
+    id uuid not null default gen_random_uuid (),
+    constraint people_branches_pkey primary key (id),
+    constraint people_branches_branch_id_fkey foreign KEY (branch_id) references branches (id) on delete CASCADE,
+    constraint people_branches_person_id_fkey foreign KEY (person_id) references people (id) on delete CASCADE
+  ) TABLESPACE pg_default;
+  
+  create view public.people_branches_view as
+  select
+    pb.id,
+    pb.person_id,
+    p.name as person_name,
+    pb.branch_id,
+    b.name as branch_name,
+    pb.assigned_at
+  from
+    people_branches pb
+    join people p on pb.person_id = p.id
+    join branches b on pb.branch_id = b.id;
+  
   create table public.product_adjustments (
     id uuid not null default gen_random_uuid (),
     adjustment_batch_id uuid null,
@@ -330,7 +365,6 @@ create table public.accounts (
     reference text not null,
     invoice_number text null,
     date date not null,
-    customer uuid not null,
     warehouse uuid not null,
     order_tax numeric not null default 0,
     discount numeric not null default 0,
@@ -342,11 +376,12 @@ create table public.accounts (
     created_at timestamp without time zone not null default now(),
     is_return boolean not null default false,
     original_sale_id uuid null,
+    people_branches_id uuid null,
     constraint sales_pkey primary key (id),
     constraint sales_reference_key unique (reference),
     constraint sales_warehouse_fkey foreign KEY (warehouse) references warehouses (id),
     constraint sales_original_sale_id_fkey foreign KEY (original_sale_id) references sales (id),
-    constraint sales_customer_fkey foreign KEY (customer) references people (id),
+    constraint sales_people_branches_id_fkey foreign KEY (people_branches_id) references people_branches (id),
     constraint sales_order_tax_check check ((order_tax >= (0)::numeric)),
     constraint sales_discount_check check ((discount >= (0)::numeric)),
     constraint sales_shipping_check check ((shipping >= (0)::numeric)),

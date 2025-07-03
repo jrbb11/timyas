@@ -1,7 +1,7 @@
 import AdminLayout from '../layouts/AdminLayout';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { customersService } from '../services/customersService';
-import { FaEye, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaSearch, FaUserCircle } from 'react-icons/fa';
 import Modal from '../components/ui/Modal';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
+import { supabase } from '../utils/supabaseClient';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -24,7 +25,6 @@ const Customers = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewCustomer, setViewCustomer] = useState<any | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', email: '', phone: '', address: '', city: '', country: '' });
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -39,6 +39,13 @@ const Customers = () => {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<string[]>([]);
+  const [branchDetails, setBranchDetails] = useState<any[]>([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [salesStats, setSalesStats] = useState({ total: 0, paid: 0, unpaid: 0 });
+  const [customerSalesTotals, setCustomerSalesTotals] = useState<Record<string, number>>({});
+  const [customerPaidTotals, setCustomerPaidTotals] = useState<Record<string, number>>({});
+  const [customerDuesTotals, setCustomerDuesTotals] = useState<Record<string, number>>({});
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'total', direction: 'desc' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,6 +61,36 @@ const Customers = () => {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    // Fetch all sales_view for stats and per-customer totals
+    supabase
+      .from('sales_view')
+      .select('person_id, total_amount, payment_status, due, paid')
+      .then(({ data: sales }) => {
+        if (!sales) return;
+        let total = 0, paid = 0, unpaid = 0;
+        const totals: Record<string, number> = {};
+        const dues: Record<string, number> = {};
+        const paids: Record<string, number> = {};
+        sales.forEach((s: any) => {
+          if (s.person_id) {
+            totals[s.person_id] = (totals[s.person_id] || 0) + Number(s.total_amount || 0);
+            paids[s.person_id] = (paids[s.person_id] || 0) + Number(s.paid || 0);
+            if (s.payment_status === 'pending' || s.payment_status === 'partial') {
+              dues[s.person_id] = (dues[s.person_id] || 0) + Number(s.due || 0);
+            }
+          }
+          total += Number(s.total_amount || 0);
+          if (s.payment_status === 'paid') paid += Number(s.total_amount || 0);
+          else if (s.payment_status === 'pending' || s.payment_status === 'partial') unpaid += Number(s.total_amount || 0);
+        });
+        setSalesStats({ total, paid, unpaid });
+        setCustomerSalesTotals(totals);
+        setCustomerPaidTotals(paids);
+        setCustomerDuesTotals(dues);
+      });
+  }, [customers]);
 
   const filteredCustomers = customers.filter((customer) => {
     const searchTerm = search.toLowerCase();
@@ -73,6 +110,30 @@ const Customers = () => {
   const totalRows = filteredCustomers.length;
   const startRow = totalRows === 0 ? 0 : currentPage * rowsPerPage + 1;
   const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
+
+  const handleSort = (key: string) => {
+    setSortConfig((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'desc' };
+    });
+  };
+
+  const sortedCustomers = [...paginatedCustomers].sort((a, b) => {
+    let aValue = 0, bValue = 0;
+    if (sortConfig.key === 'total') {
+      aValue = customerSalesTotals[a.id] || 0;
+      bValue = customerSalesTotals[b.id] || 0;
+    } else if (sortConfig.key === 'paid') {
+      aValue = customerPaidTotals[a.id] || 0;
+      bValue = customerPaidTotals[b.id] || 0;
+    } else if (sortConfig.key === 'dues') {
+      aValue = customerDuesTotals[a.id] || 0;
+      bValue = customerDuesTotals[b.id] || 0;
+    }
+    return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+  });
 
   const handleEdit = (customer: any) => {
     setEditForm({
@@ -127,66 +188,6 @@ const Customers = () => {
     setLoadingAction(false);
   };
 
-  const handleOpenCreate = () => {
-    setCreateForm({ name: '', email: '', phone: '', address: '', city: '', country: '' });
-    setCreateError(null);
-    setCreateSuccess(false);
-    setShowCreateModal(true);
-  };
-
-  const handleCreateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCreateForm({ ...createForm, [e.target.name]: e.target.value });
-  };
-
-  const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreateLoading(true);
-    setCreateError(null);
-    setCreateSuccess(false);
-    const { error } = await customersService.create(createForm);
-    setCreateLoading(false);
-    if (error) {
-      setCreateError(error.message);
-    } else {
-      setCreateSuccess(true);
-      setShowCreateModal(false);
-      // Refresh the customers list
-      customersService.getAll().then(({ data, error }) => {
-        if (!error) setCustomers(data || []);
-      });
-    }
-  };
-
-  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditForm({ ...editForm, [e.target.name]: e.target.value });
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setEditLoading(true);
-    setEditError(null);
-    setEditSuccess(false);
-    const { error } = await customersService.update(editForm.id, {
-      name: editForm.name,
-      email: editForm.email,
-      phone: editForm.phone,
-      address: editForm.address,
-      city: editForm.city,
-      country: editForm.country,
-    });
-    setEditLoading(false);
-    if (error) {
-      setEditError(error.message);
-    } else {
-      setEditSuccess(true);
-      setShowEditModal(false);
-      // Refresh the customers list
-      customersService.getAll().then(({ data, error }) => {
-        if (!error) setCustomers(data || []);
-      });
-    }
-  };
-
   const handleExportCSV = () => {
     const csv = Papa.unparse(filteredCustomers.map(({ id, name, email, phone, address, city, country, created_at }) => ({ id, name, email, phone, address, city, country, created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -227,10 +228,45 @@ const Customers = () => {
     }
   }, [toast]);
 
+  useEffect(() => {
+    if (!viewCustomer) return;
+    setLoadingBranches(true);
+    // 1. Fetch all people_branches_view for this customer
+    supabase
+      .from('people_branches_view')
+      .select('*')
+      .eq('person_id', viewCustomer.id)
+      .then(async ({ data: branches }) => {
+        if (!branches) {
+          setBranchDetails([]);
+          setLoadingBranches(false);
+          return;
+        }
+        // 2. For each branch, fetch sales_view and calculate totals
+        const details = await Promise.all(
+          branches.map(async (pb: any) => {
+            const { data: sales } = await supabase
+              .from('sales_view')
+              .select('total_amount, due')
+              .eq('people_branches_id', pb.id);
+            const totalSales = (sales || []).reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+            const totalDue = (sales || []).reduce((sum, s) => sum + (Number(s.due) > 0 ? Number(s.due) : 0), 0);
+            return {
+              branchName: pb.branch_name,
+              totalSales,
+              totalDue,
+            };
+          })
+        );
+        setBranchDetails(details);
+        setLoadingBranches(false);
+      });
+  }, [viewCustomer]);
+
   return (
     <AdminLayout
-      title="Customers"
-      breadcrumb={<span>People &gt; <span className="text-gray-900">Customers</span></span>}
+      title="Franchisee"
+      breadcrumb={<span>People &gt; <span className="text-gray-900">Franchisee</span></span>}
     >
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -248,38 +284,82 @@ const Customers = () => {
               />
             </div>
           </div>
-          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={handleOpenCreate} type="button">+ Create</button>
+          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/franchisee/create')} type="button">+ Add Franchisee</button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="rounded-xl bg-blue-50 p-5 flex flex-col gap-2 shadow">
+            <div className="flex items-center gap-2 text-blue-700 font-semibold text-sm">
+              <span className="bg-blue-100 rounded-full p-2"><svg width="18" height="18" fill="currentColor"><circle cx="9" cy="9" r="8" /></svg></span>
+              Total Sales
+            </div>
+            <div className="text-2xl font-bold text-blue-800">₱{salesStats.total.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl bg-green-50 p-5 flex flex-col gap-2 shadow">
+            <div className="flex items-center gap-2 text-green-700 font-semibold text-sm">
+              <span className="bg-green-100 rounded-full p-2"><svg width="18" height="18" fill="currentColor"><circle cx="9" cy="9" r="8" /></svg></span>
+              Paid Sales
+            </div>
+            <div className="text-2xl font-bold text-green-800">₱{salesStats.paid.toLocaleString()}</div>
+          </div>
+          <div className="rounded-xl bg-red-50 p-5 flex flex-col gap-2 shadow">
+            <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+              <span className="bg-red-100 rounded-full p-2"><svg width="18" height="18" fill="currentColor"><circle cx="9" cy="9" r="8" /></svg></span>
+              Unpaid Sales
+            </div>
+            <div className="text-2xl font-bold text-red-800">₱{salesStats.unpaid.toLocaleString()}</div>
+          </div>
         </div>
         <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
-          <table className="min-w-full">
-            <thead>
-              <tr className="border-b">
+          <table className="min-w-full rounded-lg overflow-hidden shadow bg-white">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-4 text-left font-semibold">Avatar</th>
                 <th className="p-4 text-left font-semibold">Name</th>
                 <th className="p-4 text-left font-semibold">Email</th>
                 <th className="p-4 text-left font-semibold">Phone</th>
-                <th className="p-4 text-left font-semibold">Address</th>
-                <th className="p-4 text-left font-semibold">City</th>
-                <th className="p-4 text-left font-semibold">Country</th>
-                <th className="p-4 font-semibold">Actions</th>
+                <th className="p-4 text-left font-semibold">Status</th>
+                <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('total')}>
+                  Total Sales {sortConfig.key === 'total' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('paid')}>
+                  Paid {sortConfig.key === 'paid' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="p-4 text-left font-semibold cursor-pointer" onClick={() => handleSort('dues')}>
+                  Dues {sortConfig.key === 'dues' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                </th>
+                <th className="p-4 text-left font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedCustomers.map(customer => (
+              {sortedCustomers.map((customer) => (
                 <tr key={customer.id} className="border-b hover:bg-gray-50">
-                  <td className="p-4">{customer.name}</td>
+                  <td className="p-4">
+                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-600">
+                      {customer.name ? customer.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2) : <FaUserCircle size={32} />}
+                    </div>
+                  </td>
+                  <td className="p-4 font-medium text-gray-900">{customer.name}</td>
                   <td className="p-4">{customer.email}</td>
                   <td className="p-4">{customer.phone}</td>
-                  <td className="p-4">{customer.address}</td>
-                  <td className="p-4">{customer.city}</td>
-                  <td className="p-4">{customer.country}</td>
+                  <td className="p-4">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Active</span>
+                  </td>
+                  <td className="p-4">₱{customerSalesTotals[customer.id]?.toLocaleString() || 0}</td>
+                  <td className="p-4 text-green-700 font-semibold">₱{customerPaidTotals[customer.id]?.toLocaleString() || 0}</td>
+                  <td className="p-4 text-red-600 font-semibold">₱{customerDuesTotals[customer.id]?.toLocaleString() || 0}</td>
                   <td className="p-4 flex gap-2">
-                    <button className="text-blue-600 hover:underline" onClick={() => handleView(customer)}><FaEye /></button>
-                    <button className="text-yellow-600 hover:underline" onClick={() => handleEdit(customer)}><FaEdit /></button>
-                    <button className="text-red-600 hover:underline" onClick={() => { setCustomerToDelete(customer); setShowDeleteConfirm(true); }}><FaTrash /></button>
+                    <button
+                      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded font-semibold"
+                      onClick={() => setViewCustomer(customer)}
+                    >View</button>
+                    <button
+                      className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded font-semibold"
+                      onClick={() => alert('Send follow up for dues!')}
+                    >Send Follow Up for Dues</button>
                   </td>
                 </tr>
               ))}
-              {paginatedCustomers.length === 0 && (
+              {sortedCustomers.length === 0 && (
                 <tr><td colSpan={7} className="text-center p-6 text-gray-400">No customers found.</td></tr>
               )}
             </tbody>
@@ -319,17 +399,70 @@ const Customers = () => {
         </div>
         {/* View Modal */}
         {viewCustomer && (
-          <Modal isOpen={!!viewCustomer} onClose={() => setViewCustomer(null)} title="Customer Details">
-            <div className="space-y-2">
-              <div><span className="font-medium text-gray-500">Name:</span> <span className="font-semibold text-gray-900">{viewCustomer.name}</span></div>
-              <div><span className="font-medium text-gray-500">Email:</span> <span className="font-semibold text-gray-900">{viewCustomer.email}</span></div>
-              <div><span className="font-medium text-gray-500">Phone:</span> <span className="font-semibold text-gray-900">{viewCustomer.phone}</span></div>
-              <div><span className="font-medium text-gray-500">Address:</span> <span className="font-semibold text-gray-900">{viewCustomer.address}</span></div>
-              <div><span className="font-medium text-gray-500">City:</span> <span className="font-semibold text-gray-900">{viewCustomer.city}</span></div>
-              <div><span className="font-medium text-gray-500">Country:</span> <span className="font-semibold text-gray-900">{viewCustomer.country}</span></div>
-              <div><span className="font-medium text-gray-500">Created At:</span> <span className="font-semibold text-gray-900">{viewCustomer.created_at}</span></div>
+          <Modal isOpen={!!viewCustomer} onClose={() => setViewCustomer(null)} title={null}>
+            <div className="flex flex-col gap-6">
+              {/* Franchisee summary */}
+              <div className="flex flex-col md:flex-row md:items-center gap-4 border-b pb-4">
+                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-600">
+                  {viewCustomer.name ? viewCustomer.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0,2) : <FaUserCircle size={40} />}
+                </div>
+                <div className="flex-1">
+                  <div className="text-xl font-bold text-gray-900">{viewCustomer.name}</div>
+                  <div className="text-gray-600 text-sm">{viewCustomer.email || <span className="italic text-gray-400">No email</span>}</div>
+                  <div className="text-gray-600 text-sm">{viewCustomer.phone || <span className="italic text-gray-400">No phone</span>}</div>
+                  <div className="text-gray-600 text-sm">{[viewCustomer.address, viewCustomer.city, viewCustomer.country].filter(Boolean).join(', ') || <span className="italic text-gray-400">No address</span>}</div>
+                </div>
+              </div>
+              {/* Branches grid */}
+              {loadingBranches ? (
+                <div className="py-8 text-center text-gray-400">Loading branch details...</div>
+              ) : branchDetails.length === 0 ? (
+                <div className="py-8 text-center text-gray-400">No branches found for this customer.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {branchDetails.map((b, i) => (
+                    <div key={i} className="bg-white rounded-xl shadow p-5 flex flex-col gap-2 border pb-4">
+                      <div className="flex flex-col items-center gap-y-1 mb-2 min-h-[3.5rem]">
+                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">Branch</span>
+                        <span
+                          className="font-semibold text-lg text-blue-900 text-center line-clamp-2"
+                          style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            minHeight: '2.5rem',
+                            maxHeight: '2.5rem',
+                            lineHeight: '1.25rem',
+                            height: '2.5rem',
+                            width: '100%',
+                          }}
+                        >
+                          {b.branchName}
+                        </span>
+                      </div>
+                      <div className="text-gray-600 text-sm">Code: <span className="font-mono">{b.code || '-'}</span></div>
+                      <div className="text-gray-600 text-sm">Address: {b.address || <span className="italic text-gray-400">N/A</span>}</div>
+                      <div className="text-gray-600 text-sm">City: {b.city || <span className="italic text-gray-400">N/A</span>}</div>
+                      <div className="text-gray-600 text-sm">Country: {b.country || <span className="italic text-gray-400">N/A</span>}</div>
+                      <div className="flex flex-col gap-2 mt-6">
+                        <div className="flex flex-col items-center bg-blue-100 rounded-lg px-4 py-2">
+                          <span className="text-xs font-semibold text-blue-700">Total Sales</span>
+                          <span className="text-lg font-bold text-blue-800">₱{b.totalSales.toLocaleString()}</span>
+                        </div>
+                        <div className="flex flex-col items-center bg-red-100 rounded-lg px-4 py-2">
+                          <span className="text-xs font-semibold text-red-700">Total Due</span>
+                          <span className="text-lg font-bold text-red-800">₱{b.totalDue.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end mt-6">
+                <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold" onClick={() => setViewCustomer(null)}>Close</button>
+              </div>
             </div>
-            <button className="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200" onClick={() => setViewCustomer(null)}>Close</button>
           </Modal>
         )}
         {/* Delete Confirmation Modal */}
@@ -341,45 +474,6 @@ const Customers = () => {
             <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700" onClick={handleDelete} disabled={loadingAction}>{loadingAction ? 'Deleting...' : 'Delete'}</button>
           </div>
         </Modal>
-        {/* Create Customer Modal */}
-        {showCreateModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-8 relative">
-              <h2 className="text-2xl font-bold mb-6">Create Customer</h2>
-              <form onSubmit={handleCreateSubmit} className="space-y-5">
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">Name</label>
-                  <input name="name" value={createForm.name} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" required />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">Email</label>
-                  <input name="email" value={createForm.email} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" type="email" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">Phone</label>
-                  <input name="phone" value={createForm.phone} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">Address</label>
-                  <input name="address" value={createForm.address} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">City</label>
-                  <input name="city" value={createForm.city} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
-                </div>
-                <div>
-                  <label className="block mb-1 font-medium text-gray-700">Country</label>
-                  <input name="country" value={createForm.country} onChange={handleCreateChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black" />
-                </div>
-                <div className="flex gap-2 justify-end pt-4">
-                  <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={() => setShowCreateModal(false)} disabled={createLoading}>Cancel</button>
-                  <button type="submit" className="bg-black text-white font-semibold rounded-lg px-4 py-2" disabled={createLoading}>{createLoading ? 'Saving...' : 'Save Customer'}</button>
-                </div>
-                {createError && <div className="text-red-600 text-sm mt-2">{createError}</div>}
-              </form>
-            </div>
-          </div>
-        )}
         {/* Edit Customer Modal */}
         {showEditModal && (
           <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm">

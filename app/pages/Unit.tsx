@@ -2,8 +2,8 @@ import AdminLayout from '../layouts/AdminLayout';
 import { FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../components/ui/Modal';
-import { supabase } from '../utils/supabaseClient';
 import { unitsService } from '../services/unitsService';
+import UniversalSelect from "../components/ui/UniversalSelect";
 
 type UnitType = {
   id: string;
@@ -259,11 +259,22 @@ const Unit = () => {
         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
           <div>
             Rows per page:
-            <select className="ml-2 border rounded px-2 py-1" value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(0); }}>
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-            </select>
+            <UniversalSelect
+              value={{ value: String(rowsPerPage), label: String(rowsPerPage) }}
+              onChange={option => {
+                if (option) {
+                  setRowsPerPage(Number(option.value));
+                  setCurrentPage(0);
+                }
+              }}
+              options={[
+                { value: "10", label: "10" },
+                { value: "25", label: "25" },
+                { value: "50", label: "50" }
+              ]}
+              isSearchable={false}
+              menuPlacement="auto"
+            />
           </div>
           <div>
             {startRow} - {endRow} of {totalRows}
@@ -309,15 +320,21 @@ const Unit = () => {
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">Operator</label>
-              <select
-                className="w-full border rounded px-3 py-2"
-                name="operator"
-                value={form.operator}
-                onChange={handleChange}
-              >
-                <option value="*">*</option>
-                <option value="/">/</option>
-              </select>
+              <UniversalSelect
+                value={{ value: form.operator, label: form.operator }}
+                onChange={option => {
+                  if (option) setForm({ ...form, operator: option.value });
+                }}
+                options={[
+                  { value: '*', label: '*' },
+                  { value: '/', label: '/' }
+                ]}
+                isSearchable={false}
+                menuPlacement="auto"
+                placeholder="Select operator"
+                menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+              />
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">Operation Value</label>

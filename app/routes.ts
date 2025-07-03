@@ -34,4 +34,6 @@ export default [
   route("expense-categories", "pages/ExpenseCategories.tsx"),
   route("taxes", "pages/Taxes.tsx"),
   route("reports", "pages/Reports.tsx"),
+  route("settings/people-branches", "pages/PeopleBranchAssignment.tsx"),
+  route("franchisee/create", "pages/FranchiseeCreate.tsx"),
 ] satisfies RouteConfig;

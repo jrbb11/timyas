@@ -187,7 +187,7 @@ export const Sidebar = () => {
             </a>
             {/* Customers link */}
             <Link to="/customers" className="flex items-center gap-3 text-gray-700 hover:text-primary py-2">
-              <FaUsers /> Customers
+              <FaUsers /> Franchisee
             </Link>
           </div>
           {/* Finance Section */}
@@ -246,6 +246,9 @@ export const Sidebar = () => {
                   </Link>
                   <Link to="/taxes" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
                     <FaFileInvoice /> Taxes
+                  </Link>
+                  <Link to="/settings/people-branches" className="flex items-center gap-3 px-4 py-2 text-gray-700 hover:bg-gray-50">
+                    <FaUsers /> People Branch Assignment
                   </Link>
                 </div>
               )}

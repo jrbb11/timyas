@@ -57,4 +57,7 @@ export const salesService = {
       .eq('entity_id', saleId)
       .order('created_at', { ascending: false });
   },
+  async getBranchById(id: string) {
+    return supabase.from('branches').select('id, name').eq('id', id).single();
+  },
 }; 

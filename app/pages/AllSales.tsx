@@ -16,6 +16,7 @@ import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
+import { supabase } from '../utils/supabaseClient';
 
 declare module 'react-date-range';
 
@@ -58,9 +59,6 @@ const AllSales = () => {
         return;
       }
       setSales(data || []);
-      if (data && data.length > 0) {
-        console.log('First sale object:', data[0]);
-      }
       setLoading(false);
     });
   }, []);
@@ -119,7 +117,7 @@ const AllSales = () => {
     const matchesSearch =
       sale.reference?.toLowerCase().includes(searchTerm) ||
       sale.invoice_number?.toLowerCase().includes(searchTerm) ||
-      sale.customer_name?.toLowerCase().includes(searchTerm) ||
+      sale.customer?.toLowerCase().includes(searchTerm) ||
       sale.warehouse_name?.toLowerCase().includes(searchTerm);
     let matchesDate = true;
     if (dateRange[0].startDate && dateRange[0].endDate) {
@@ -144,20 +142,20 @@ const AllSales = () => {
     const doc = new jsPDF();
     autoTable(doc, {
       head: [["ID", "Reference", "Invoice", "Date", "Customer", "Warehouse", "Status", "Payment Status", "Grand Total", "Shipping Fee", "Total", "Created At"]],
-      body: filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => [id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, Number(total_amount - (shipping || 0)).toLocaleString(), Number(shipping || 0).toLocaleString(), Number(total_amount).toLocaleString(), created_at]),
+      body: filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => [id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, Number(total_amount - (shipping || 0)).toLocaleString(), Number(shipping || 0).toLocaleString(), Number(total_amount).toLocaleString(), created_at]),
     });
     doc.save('sales.pdf');
   };
 
   const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
+    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sales');
     XLSX.writeFile(wb, 'sales.xlsx');
   };
 
   const handleExportCSV = () => {
-    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
+    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -170,7 +168,7 @@ const AllSales = () => {
 
   const handleExportSelectedSales = () => {
     const selectedSales = sales.filter(s => selected.includes(s.id));
-    const csv = Papa.unparse(selectedSales.map(({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer_name, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
+    const csv = Papa.unparse(selectedSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -344,9 +342,8 @@ const AllSales = () => {
                   </th>
                   <th className="p-4 text-left font-semibold">Reference</th>
                   <th className="p-4 text-left font-semibold">Invoice</th>
-                  <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('customer_name')}>
-                    Customer {sortConfig.key === 'customer_name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                  </th>
+                  <th className="p-4 text-left font-semibold">Customer</th>
+                  <th className="p-4 text-left font-semibold">Branch</th>
                   <th className="p-4 text-left font-semibold">Warehouse</th>
                   <th className="p-4 text-left font-semibold">Status</th>
                   <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('total_amount')}>
@@ -366,7 +363,8 @@ const AllSales = () => {
                     <td className="p-4 font-medium">{sale.date}</td>
                     <td className="p-4 text-purple-600 hover:underline cursor-pointer">{sale.reference}</td>
                     <td className="p-4">{sale.invoice_number}</td>
-                    <td className="p-4">{sale.customer_name}</td>
+                    <td className="p-4">{sale.customer}</td>
+                    <td className="p-4">{sale.branch}</td>
                     <td className="p-4">{sale.warehouse_name}</td>
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${sale.status === 'delivered' ? 'bg-green-50 text-green-600' : sale.status === 'pending' ? 'bg-yellow-50 text-yellow-700' : sale.status === 'cancel' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'}`}>{sale.status.charAt(0).toUpperCase() + sale.status.slice(1)}</span>
@@ -455,7 +453,8 @@ const AllSales = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div><span className="font-medium text-gray-500">Reference:</span> <span className="font-semibold text-gray-900">{viewSale.reference}</span></div>
             <div><span className="font-medium text-gray-500">Invoice:</span> <span className="font-semibold text-gray-900">{viewSale.invoice_number}</span></div>
-            <div><span className="font-medium text-gray-500">Customer:</span> <span className="font-semibold text-gray-900">{viewSale.customer_name}</span></div>
+            <div><span className="font-medium text-gray-500">Customer:</span> <span className="font-semibold text-gray-900">{viewSale.customer}</span></div>
+            <div><span className="font-medium text-gray-500">Branch:</span> <span className="font-semibold text-gray-900">{viewSale.branch}</span></div>
             <div><span className="font-medium text-gray-500">Warehouse:</span> <span className="font-semibold text-gray-900">{viewSale.warehouse_name}</span></div>
             <div><span className="font-medium text-gray-500">Status:</span> <span className="font-semibold text-gray-900">{viewSale.status}</span></div>
             <div><span className="font-medium text-gray-500">Payment Status:</span> <span className="font-semibold text-gray-900">{viewSale.payment_status}</span></div>

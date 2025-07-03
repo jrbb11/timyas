@@ -3,6 +3,7 @@ import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
 import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import UniversalSelect from '../components/ui/UniversalSelect';
 
 type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
@@ -113,15 +114,25 @@ const Deposits = () => {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Account</label>
-                  <select name="account" value={form.account} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    {accounts.map(acc => <option key={acc.id} value={acc.name}>{acc.name}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={accounts.find((acc: any) => acc.name === form.account) ? { value: form.account, label: form.account } : null}
+                    onChange={option => setForm({ ...form, account: option ? option.value : '' })}
+                    options={accounts.map((acc: any) => ({ value: acc.name, label: acc.name }))}
+                    placeholder="Select account..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Category</label>
-                  <select name="category" value={form.category} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={categories.find((cat: any) => cat.name === form.category) ? { value: form.category, label: form.category } : null}
+                    onChange={option => setForm({ ...form, category: option ? option.value : '' })}
+                    options={categories.map((cat: any) => ({ value: cat.name, label: cat.name }))}
+                    placeholder="Select category..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Amount</label>

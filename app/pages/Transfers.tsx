@@ -3,10 +3,13 @@ import AdminLayout from '../layouts/AdminLayout';
 import { accountsService } from '../services/accountsService';
 import { supabase } from '../utils/supabaseClient';
 import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
+import UniversalSelect from '../components/ui/UniversalSelect';
+
+type Account = { id: string; name: string };
 
 const Transfers = () => {
   const [transfers, setTransfers] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editTransfer, setEditTransfer] = useState(null);
@@ -15,7 +18,7 @@ const Transfers = () => {
 
   useEffect(() => {
     supabase.from('transfers').select('*').then(({ data }) => setTransfers(data || []));
-    accountsService.getAll().then(({ data }) => setAccounts(data || []));
+    accountsService.getAll().then(({ data }) => setAccounts((data || []) as Account[]));
   }, []);
 
   const filtered: any[] = transfers.filter(t => t.from.toLowerCase().includes(search.toLowerCase()) || t.to.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase()));
@@ -138,17 +141,25 @@ const Transfers = () => {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">From</label>
-                  <select name="from" value={form.from} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    <option value="">Select account...</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={accounts.find((acc: Account) => acc.id === form.from) ? { value: form.from, label: accounts.find((acc: Account) => acc.id === form.from)?.name } as import('../components/ui/UniversalSelect').UniversalSelectOption : null}
+                    onChange={option => setForm({ ...form, from: option ? option.value : '' })}
+                    options={accounts.map((acc: Account) => ({ value: acc.id, label: acc.name }))}
+                    placeholder="Select account..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">To</label>
-                  <select name="to" value={form.to} onChange={handleChange} className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-black">
-                    <option value="">Select account...</option>
-                    {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
-                  </select>
+                  <UniversalSelect
+                    value={accounts.find((acc: Account) => acc.id === form.to) ? { value: form.to, label: accounts.find((acc: Account) => acc.id === form.to)?.name } as import('../components/ui/UniversalSelect').UniversalSelectOption : null}
+                    onChange={option => setForm({ ...form, to: option ? option.value : '' })}
+                    options={accounts.map((acc: Account) => ({ value: acc.id, label: acc.name }))}
+                    placeholder="Select account..."
+                    menuPortalTarget={typeof window !== 'undefined' ? document.body : undefined}
+                    styles={{ menuPortal: base => ({ ...base, zIndex: 9999 }) }}
+                  />
                 </div>
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">Amount</label>

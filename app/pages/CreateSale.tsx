@@ -9,17 +9,17 @@ import Modal from '../components/ui/Modal';
 import { salesService } from '../services/salesService';
 import { saleItemsService } from '../services/saleItemsService';
 import { getCurrentUser } from '../utils/supabaseClient';
+import { supabase } from '../utils/supabaseClient';
+import Select from 'react-select';
 
 const CreateSale = () => {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
-  const [customers, setCustomers] = useState<any[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [productStocks, setProductStocks] = useState<any>({});
-  const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingWarehouses, setLoadingWarehouses] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -45,8 +45,7 @@ const CreateSale = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add state for selected customer and warehouse
-  const [selectedCustomer, setSelectedCustomer] = useState('');
+  // Add state for selected warehouse
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
 
   // Add state for status and payment status
@@ -59,15 +58,18 @@ const CreateSale = () => {
   const [auditError, setAuditError] = useState<string | null>(null);
   const [userMap, setUserMap] = useState<Record<string, string>>({});
 
+  // Add state for branches
+  const [peopleBranches, setPeopleBranches] = useState<any[]>([]);
+  const [selectedPeopleBranch, setSelectedPeopleBranch] = useState('');
+
   // Fetch all dropdown data
   useEffect(() => {
-    customersService.getAll().then(({ data }) => {
-      setCustomers(data || []);
-      setLoadingCustomers(false);
-    });
     warehousesService.getAll().then(({ data }) => {
       setWarehouses(data || []);
       setLoadingWarehouses(false);
+    });
+    supabase.from('people_branches_view').select('*').then(({ data }) => {
+      setPeopleBranches(data || []);
     });
     Promise.all([
       productsService.getAll(),
@@ -94,7 +96,6 @@ const CreateSale = () => {
         const sale = saleRes.data;
         setInvoiceNumber(sale.invoice_number || '');
         setDate(sale.date || new Date().toISOString().slice(0, 10));
-        setSelectedCustomer(sale.customer || '');
         setSelectedWarehouse(sale.warehouse || '');
         setOrderTaxPercent(sale.order_tax || 0);
         setOrderDiscount(sale.discount || 0);
@@ -102,6 +103,7 @@ const CreateSale = () => {
         setStatus(sale.status || 'order_placed');
         setPaymentStatus(sale.payment_status || 'pending');
         setNote(sale.note || '');
+        setSelectedPeopleBranch(sale.people_branches_id || '');
       }
       // Map sale items to orderItems format
       setOrderItems((itemsRes.data || []).map((item: any) => ({
@@ -264,7 +266,7 @@ const CreateSale = () => {
         const saleData = {
           invoice_number: invoiceNumber,
           date,
-          customer: selectedCustomer,
+          people_branches_id: selectedPeopleBranch,
           warehouse: selectedWarehouse,
           order_tax: orderTaxPercent,
           discount: orderDiscount,
@@ -295,14 +297,14 @@ const CreateSale = () => {
       const saleData = {
         invoice_number: invoiceNumber,
         date: new Date().toISOString().slice(0, 10),
-        customer: selectedCustomer,
+        people_branches_id: selectedPeopleBranch,
         warehouse: selectedWarehouse,
         order_tax: orderTaxPercent,
         discount: orderDiscount,
         shipping,
         status,
         payment_status: paymentStatus,
-        note: '', // or from form
+        note,
         total_amount: grandTotal,
       };
       console.log('saleData', saleData);
@@ -418,19 +420,80 @@ const CreateSale = () => {
               <input type="date" className="w-full border rounded px-3 py-2" defaultValue={new Date().toISOString().slice(0,10)} required />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Customer *</label>
-              <select
-                className="w-full border rounded px-3 py-2"
+              <label className="block text-sm font-medium mb-1">Customer & Branch *</label>
+              <Select
+                classNamePrefix="react-select"
+                options={peopleBranches.map(pb => ({
+                  value: pb.id,
+                  label: pb.person_name,
+                  branch: pb.branch_name
+                }))}
+                value={peopleBranches
+                  .map(pb => ({ value: pb.id, label: pb.person_name, branch: pb.branch_name }))
+                  .find(opt => opt.value === selectedPeopleBranch) || null}
+                onChange={opt => setSelectedPeopleBranch(opt ? opt.value : '')}
+                placeholder="Choose Customer & Branch"
+                isClearable
                 required
-                disabled={loadingCustomers}
-                value={selectedCustomer}
-                onChange={e => setSelectedCustomer(e.target.value)}
-              >
-                <option value="">{loadingCustomers ? 'Loading...' : 'Choose Customer'}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                formatOptionLabel={(option, { context }) => (
+                  context === 'menu' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: 700 }}>{option.label}</span>
+                      <span style={{ color: '#2563eb', fontSize: 13 }}>{option.branch}</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 700 }}>{option.label}</span>
+                      <span style={{ color: '#2563eb', fontSize: 13 }}>
+                        ({option.branch})
+                      </span>
+                    </div>
+                  )
+                )}
+                styles={{
+                  control: (base, state) => ({
+                    ...base,
+                    minHeight: '40px',
+                    height: '40px',
+                    borderRadius: '6px',
+                    borderColor: state.isFocused ? '#111827' : '#111827',
+                    boxShadow: state.isFocused ? '0 0 0 2px #374151' : 'none',
+                    fontSize: '16px',
+                    fontFamily: 'inherit',
+                    paddingLeft: '0.75rem',
+                    paddingRight: '0.75rem',
+                    backgroundColor: 'white',
+                    '&:hover': { borderColor: '#111827' },
+                  }),
+                  valueContainer: (base) => ({
+                    ...base,
+                    padding: '0',
+                  }),
+                  input: (base) => ({
+                    ...base,
+                    margin: '0',
+                    padding: '0',
+                  }),
+                  option: (base, state) => ({
+                    ...base,
+                    backgroundColor: state.isSelected ? '#f3f4f6' : state.isFocused ? '#e0e7ff' : 'white',
+                    color: '#111827',
+                    padding: 12,
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontFamily: 'inherit',
+                  }),
+                  singleValue: (base) => ({ ...base, display: 'flex', alignItems: 'center', gap: 8, fontSize: '16px', fontFamily: 'inherit' }),
+                  menu: (base) => ({ ...base, borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }),
+                  placeholder: (base) => ({ ...base, color: '#9ca3af', fontSize: '16px', fontFamily: 'inherit' }),
+                  indicatorSeparator: () => ({ display: 'none' }),
+                  dropdownIndicator: (base, state) => ({
+                    ...base,
+                    color: state.isFocused ? '#a78bfa' : '#9ca3af',
+                    '&:hover': { color: '#a78bfa' },
+                  }),
+                }}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Warehouse *</label>
