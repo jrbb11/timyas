@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   FaChartBar, FaShoppingCart, FaUsers, FaCog, FaTags, FaMoneyBill, FaFileInvoice, FaSun, FaMoon, FaSignOutAlt, FaCreditCard, FaPlus, FaList, FaPrint, FaBoxes, FaThList, FaTrademark, FaBalanceScale, FaFile, FaExchangeAlt, FaHistory, FaQuestionCircle
 } from 'react-icons/fa';
+import { supabase } from '../utils/supabaseClient';
 
 const menu = [
   {
@@ -71,9 +72,15 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({});
   const location = useLocation();
+  const navigate = useNavigate();
 
   const handleToggleMenu = (label: string) => {
     setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
   };
 
   return (
@@ -149,7 +156,7 @@ export default function Sidebar() {
         <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-500">
           <FaQuestionCircle /> {!collapsed && 'Help Center'}
         </button>
-        <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500">
+        <button className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-50 text-red-500" onClick={handleLogout}>
           <FaSignOutAlt /> {!collapsed && 'Logout Account'}
         </button>
       </div>

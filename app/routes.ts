@@ -38,4 +38,6 @@ export default [
   route("settings/people-branches", "pages/protected/PeopleBranchAssignment.tsx"),
   route("franchisee/create", "pages/protected/FranchiseeCreate.tsx"),
   route("SaleView", "pages/protected/SaleView.tsx"),
+  route("not-approved", "pages/NotApproved.tsx"),
+  route("admin/users", "pages/protected/AdminUsers.tsx"),
 ] satisfies RouteConfig;

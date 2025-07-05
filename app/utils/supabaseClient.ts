@@ -9,4 +9,12 @@ export async function getCurrentUser() {
   const { data, error } = await supabase.auth.getUser();
   if (error) return null;
   return data.user;
+}
+
+export async function getAppUser(userId: string) {
+  return await supabase
+    .from('app_users')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
 } 

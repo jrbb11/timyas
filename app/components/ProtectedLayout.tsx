@@ -1,23 +1,33 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Outlet } from 'react-router-dom';
-import { supabase } from '../utils/supabaseClient';
+import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getCurrentUser, getAppUser } from '../utils/supabaseClient';
 
-export default function ProtectedLayout() {
+export default function ProtectedLayout({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
+  const [approved, setApproved] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setAuthenticated(true);
-      } else {
+    async function checkApproval() {
+      const user = await getCurrentUser();
+      if (!user) {
         navigate('/login');
+        return;
       }
+      const { data: appUser } = await getAppUser(user.id);
+      if (!appUser?.approved) {
+        navigate('/not-approved');
+        return;
+      }
+      setApproved(true);
       setLoading(false);
-    });
+    }
+    checkApproval();
   }, [navigate]);
 
-  if (loading) return null;
-  return authenticated ? <Outlet /> : null;
+  if (loading) return <div>Loading...</div>;
+  if (!approved) return null;
+
+  return <>{children}</>;
 } 
