@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/ui/Modal';
 import Papa from 'papaparse';
+import { PermissionButton } from '../../components/PermissionComponents';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -255,7 +256,15 @@ const AllProducts = () => {
           <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
             <button className="border border-blue-400 text-blue-600 px-4 py-2 rounded hover:bg-blue-50" onClick={handleImportClick} type="button">Import products</button>
             <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Products</button>
-            <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/products/create')} type="button">+ Create</button>
+            <PermissionButton
+              resource="products"
+              action="create"
+              className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
+              style={{minWidth: 120}}
+              onClick={() => navigate('/products/create')}
+            >
+              + Create
+            </PermissionButton>
             <input type="file" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" ref={fileInputRef} onChange={handleImportFile} className="hidden" />
             {importing && <span className="ml-2 text-blue-500">Importing...</span>}
             {importMessage && <span className="ml-2 text-sm text-green-600">{importMessage}</span>}
@@ -316,22 +325,24 @@ const AllProducts = () => {
                         >
                           <FaEye />
                         </button>
-                        <button
+                        <PermissionButton
+                          resource="products"
+                          action="update"
                           className="text-green-600 hover:text-green-800"
                           onClick={() => handleEdit(product)}
-                          title="Edit"
                           disabled={loadingAction}
                         >
                           <FaEdit />
-                        </button>
-                        <button
+                        </PermissionButton>
+                        <PermissionButton
+                          resource="products"
+                          action="delete"
                           className="text-red-600 hover:text-red-800"
                           onClick={() => { setProductToDelete(product); setShowDeleteConfirm(true); }}
-                          title="Delete"
                           disabled={loadingAction}
                         >
                           <FaTrash />
-                        </button>
+                        </PermissionButton>
                       </div>
                     </td>
                   </tr>

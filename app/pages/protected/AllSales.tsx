@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { supabase } from '../../utils/supabaseClient';
+import { PermissionButton } from '../../components/PermissionComponents';
 
 declare module 'react-date-range';
 
@@ -324,7 +325,15 @@ const AllSales = () => {
           </div>
           <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
             <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Sales</button>
-            <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/sales/create')} type="button">+ Create</button>
+            <PermissionButton
+              resource="sales"
+              action="create"
+              className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
+              style={{minWidth: 120}}
+              onClick={() => navigate('/sales/create')}
+            >
+              + Create
+            </PermissionButton>
           </div>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
@@ -379,8 +388,24 @@ const AllSales = () => {
                     <td className="p-4 text-center" style={{ minWidth: '110px', height: '100%' }}>
                       <div className="flex gap-2 items-center justify-center h-full">
                         <button className="text-gray-500 hover:text-blue-600 p-2 rounded-full transition" onClick={() => handleView(sale)} title="View"><FaEye /></button>
-                        <button className="text-gray-500 hover:text-green-600 p-2 rounded-full transition" onClick={() => handleEdit(sale)} title="Edit" disabled={loadingAction}><FaEdit /></button>
-                        <button className="text-gray-500 hover:text-red-600 p-2 rounded-full transition" onClick={() => { setSaleToDelete(sale); setShowDeleteConfirm(true); }} title="Delete" disabled={loadingAction}><FaTrash /></button>
+                        <PermissionButton
+                          resource="sales"
+                          action="update"
+                          className="text-gray-500 hover:text-green-600 p-2 rounded-full transition"
+                          onClick={() => handleEdit(sale)}
+                          disabled={loadingAction}
+                        >
+                          <FaEdit />
+                        </PermissionButton>
+                        <PermissionButton
+                          resource="sales"
+                          action="delete"
+                          className="text-gray-500 hover:text-red-600 p-2 rounded-full transition"
+                          onClick={() => { setSaleToDelete(sale); setShowDeleteConfirm(true); }}
+                          disabled={loadingAction}
+                        >
+                          <FaTrash />
+                        </PermissionButton>
                       </div>
                     </td>
                   </tr>

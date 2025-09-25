@@ -82,7 +82,9 @@ export async function getSalesByCustomer(): Promise<SalesByCustomer[]> {
     if (!grouped[row.customer]) {
       grouped[row.customer] = { customer: row.customer, total_sales: 0, total_paid: 0, total_due: 0 };
     }
-    grouped[row.customer].total_sales += row.total_amount || 0;
+    const totalAmount = row.total_amount || 0;
+    const shipping = row.shipping || 0;
+    grouped[row.customer].total_sales += (totalAmount - shipping);
     grouped[row.customer].total_paid += row.paid || 0;
     grouped[row.customer].total_due += row.due || 0;
   });

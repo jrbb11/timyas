@@ -75,15 +75,19 @@ const Customers = () => {
         const paids: Record<string, number> = {};
         sales.forEach((s: any) => {
           if (s.person_id) {
-            totals[s.person_id] = (totals[s.person_id] || 0) + Number(s.total_amount || 0);
+            const totalAmount = Number(s.total_amount || 0);
+            const shipping = Number(s.shipping || 0);
+            totals[s.person_id] = (totals[s.person_id] || 0) + (totalAmount - shipping);
             paids[s.person_id] = (paids[s.person_id] || 0) + Number(s.paid || 0);
             if (s.payment_status === 'pending' || s.payment_status === 'partial') {
               dues[s.person_id] = (dues[s.person_id] || 0) + Number(s.due || 0);
             }
           }
-          total += Number(s.total_amount || 0);
-          if (s.payment_status === 'paid') paid += Number(s.total_amount || 0);
-          else if (s.payment_status === 'pending' || s.payment_status === 'partial') unpaid += Number(s.total_amount || 0);
+          const totalAmount = Number(s.total_amount || 0);
+          const shipping = Number(s.shipping || 0);
+          total += (totalAmount - shipping);
+          if (s.payment_status === 'paid') paid += (totalAmount - shipping);
+          else if (s.payment_status === 'pending' || s.payment_status === 'partial') unpaid += (totalAmount - shipping);
         });
         setSalesStats({ total, paid, unpaid });
         setCustomerSalesTotals(totals);

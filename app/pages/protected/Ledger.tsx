@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { salePaymentsService } from '../../services/salePaymentsService';
 import { FaSearch } from 'react-icons/fa';
+import { PermissionGuard } from '../../components/PermissionComponents';
 
 const mockLedger = [
   { id: 1, type: 'Deposit', account: 'Cash', amount: 500, date: '2024-07-01', description: 'Deposit from sales' },
@@ -43,7 +44,24 @@ const Ledger = () => {
   }, [tab]);
 
   return (
-    <AdminLayout title="Ledger" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Ledger</span></span>}>
+    <PermissionGuard
+      resource="financial"
+      action="read"
+      fallback={
+        <AdminLayout title="Ledger" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Ledger</span></span>}>
+          <div className="p-6">
+            <div className="bg-white rounded-xl shadow p-12 text-center">
+              <div className="text-gray-400">
+                <div className="text-6xl mb-4">🔒</div>
+                <div className="text-xl font-semibold mb-2">Financial Data Access Restricted</div>
+                <div>You don't have permission to view ledger data</div>
+              </div>
+            </div>
+          </div>
+        </AdminLayout>
+      }
+    >
+      <AdminLayout title="Ledger" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Ledger</span></span>}>
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex-1 flex gap-2 items-center">
@@ -129,6 +147,7 @@ const Ledger = () => {
         )}
       </div>
     </AdminLayout>
+    </PermissionGuard>
   );
 };
 

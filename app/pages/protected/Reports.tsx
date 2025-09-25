@@ -10,6 +10,7 @@ import { categoriesService } from '../../services/categoriesService';
 import { brandsService } from '../../services/brandsService';
 import { unitsService } from '../../services/unitsService';
 import { customersService } from '../../services/customersService';
+import { PermissionGuard } from '../../components/PermissionComponents';
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 });
@@ -93,13 +94,19 @@ const Reports = () => {
 
   // Section: Sales
   const filteredSales = useMemo(() => filterByDate(sales, 'date'), [sales, dateRange]);
-  const totalSales = filteredSales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+  const totalSales = filteredSales.reduce((sum, s) => {
+    const totalAmount = Number(s.total_amount) || 0;
+    const shipping = Number(s.shipping) || 0;
+    return sum + (totalAmount - shipping);
+  }, 0);
   const salesChartData = (() => {
     const map: Record<string, number> = {};
     filteredSales.forEach((item) => {
       const d = item.date?.slice(0, 10);
       if (!d) return;
-      map[d] = (map[d] || 0) + (Number(item.total_amount) || 0);
+      const totalAmount = Number(item.total_amount) || 0;
+      const shipping = Number(item.shipping) || 0;
+      map[d] = (map[d] || 0) + (totalAmount - shipping);
     });
     let days: string[] = [];
     if (dateRange.from && dateRange.to) {
@@ -236,49 +243,66 @@ const Reports = () => {
         </section>
 
         {/* Sales Section */}
-        <section>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaChartBar /> Sales</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <ReportSummaryCard label="Total Sales" value={formatCurrency(totalSales)} icon={<FaChartBar className="text-blue-500" />} />
-          </div>
-          <div className="bg-white rounded-xl shadow p-6 min-h-[250px] flex flex-col items-center justify-center mb-4">
-            <div className="text-lg font-semibold mb-2">Sales Over Time</div>
-            <div className="w-full h-40 bg-gray-100 rounded flex items-center justify-center text-gray-400">
-              <svg width="100%" height="100%" viewBox={`0 0 ${salesChartData.length * 20} 100`} style={{ maxWidth: 400, height: 80 }}>
-                {salesChartData.map((d, i) => (
-                  <rect key={d.date} x={i * 20} y={100 - d.value / (Math.max(...salesChartData.map(x => x.value), 1) / 90)} width={14} height={d.value / (Math.max(...salesChartData.map(x => x.value), 1) / 90)} fill="#3b82f6" />
-                ))}
-              </svg>
+        <PermissionGuard
+          resource="financial"
+          action="read"
+          fallback={
+            <section>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaChartBar /> Sales</h2>
+              <div className="bg-white rounded-xl shadow p-6 min-h-[250px] flex flex-col items-center justify-center mb-4">
+                <div className="text-center text-gray-400">
+                  <div className="text-4xl mb-4">🔒</div>
+                  <div className="text-lg font-semibold mb-2">Financial Data Access Restricted</div>
+                  <div>You don't have permission to view sales data</div>
+                </div>
+              </div>
+            </section>
+          }
+        >
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaChartBar /> Sales</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <ReportSummaryCard label="Total Sales" value={formatCurrency(totalSales)} icon={<FaChartBar className="text-blue-500" />} />
             </div>
-          </div>
-          <div className="bg-white rounded-xl shadow p-0 overflow-x-auto mb-4">
-            <table className="min-w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="p-4 text-left font-semibold">Invoice</th>
-                  <th className="p-4 text-left font-semibold">Customer</th>
-                  <th className="p-4 text-left font-semibold">Date</th>
-                  <th className="p-4 text-left font-semibold">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentSales.length === 0 ? (
-                  <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No sales found</td></tr>
-                ) : recentSales.map((s) => (
-                  <tr key={s.id} className="border-b hover:bg-gray-50">
-                    <td className="p-4">{s.invoice_number || s.reference || s.id}</td>
-                    <td className="p-4">{s.customer_name || ''}</td>
-                    <td className="p-4">{s.date ? new Date(s.date).toLocaleDateString() : ''}</td>
-                    <td className="p-4">{formatCurrency(Number(s.total_amount) || 0)}</td>
+            <div className="bg-white rounded-xl shadow p-6 min-h-[250px] flex flex-col items-center justify-center mb-4">
+              <div className="text-lg font-semibold mb-2">Sales Over Time</div>
+              <div className="w-full h-40 bg-gray-100 rounded flex items-center justify-center text-gray-400">
+                <svg width="100%" height="100%" viewBox={`0 0 ${salesChartData.length * 20} 100`} style={{ maxWidth: 400, height: 80 }}>
+                  {salesChartData.map((d, i) => (
+                    <rect key={d.date} x={i * 20} y={100 - d.value / (Math.max(...salesChartData.map(x => x.value), 1) / 90)} width={14} height={d.value / (Math.max(...salesChartData.map(x => x.value), 1) / 90)} fill="#3b82f6" />
+                  ))}
+                </svg>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow p-0 overflow-x-auto mb-4">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-4 text-left font-semibold">Invoice</th>
+                    <th className="p-4 text-left font-semibold">Customer</th>
+                    <th className="p-4 text-left font-semibold">Date</th>
+                    <th className="p-4 text-left font-semibold">Amount</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(recentSales, 'recent_sales.csv')}>
-            <FaFileCsv /> Export Sales
-          </button>
-        </section>
+                </thead>
+                <tbody>
+                  {recentSales.length === 0 ? (
+                    <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No sales found</td></tr>
+                  ) : recentSales.map((s) => (
+                    <tr key={s.id} className="border-b hover:bg-gray-50">
+                      <td className="p-4">{s.invoice_number || s.reference || s.id}</td>
+                      <td className="p-4">{s.customer_name || ''}</td>
+                      <td className="p-4">{s.date ? new Date(s.date).toLocaleDateString() : ''}</td>
+                      <td className="p-4">{formatCurrency(Number(s.total_amount) || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(recentSales, 'recent_sales.csv')}>
+              <FaFileCsv /> Export Sales
+            </button>
+          </section>
+        </PermissionGuard>
 
         {/* Purchases Section */}
         <section>

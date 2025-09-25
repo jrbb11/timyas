@@ -1,0 +1,4 @@
+id,user_id,email,first_name,last_name,contact_number,created_at,approved
+0e6989af-4c78-415e-875d-02ae4a226845,70d1dafc-07d7-4a8d-abb8-0c4056edf758,baculijohnrobert11@gmail.com,John Robert,Baculi,09668137576,2025-07-03 15:07:51.267515+00,true
+52a3eb59-c463-42bd-aa3c-215ad3e9ff66,027fbf80-a837-47a2-b785-3c79a7bf8f81,catherineguiacpa@gmail.com,Catherine,Guia,09281547579,2025-07-04 13:56:05.818885+00,false
+8670e279-7c57-47df-ae9b-9baba014c24c,8eae8b04-752b-43a4-9719-20b43dfc51cd,catherine.limjuco@gmail.com,Catherine,Guia,09281547579,2025-07-05 02:57:02.537982+00,false

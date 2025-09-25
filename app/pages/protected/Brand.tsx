@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../../components/ui/Modal';
 import { supabase } from '../../utils/supabaseClient';
 import { brandsService } from '../../services/brandsService';
+import { PermissionButton } from '../../components/PermissionComponents';
 
 type BrandType = { id: string; name: string; description?: string; image_url?: string; created_at?: string };
 
@@ -204,15 +205,16 @@ const Brand = () => {
               />
             </div>
           </div>
-          <button
+          <PermissionButton
+            resource="products"
+            action="create"
             className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
             style={{minWidth: 120}}
             onClick={handleCreate}
             disabled={loading}
-            type="button"
           >
             + Create
-          </button>
+          </PermissionButton>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full text-sm">
@@ -244,20 +246,24 @@ const Brand = () => {
                   <td className="p-3">{brand.description}</td>
                   <td className="p-3" style={{ minWidth: '110px', height: '100%' }}>
                     <div className="flex gap-2 items-center justify-center h-full">
-                      <button
+                      <PermissionButton
+                        resource="products"
+                        action="update"
                         className="text-green-600 hover:text-green-800"
                         onClick={() => handleEdit(brand)}
                         disabled={loading}
                       >
                         <FaEdit />
-                      </button>
-                      <button
+                      </PermissionButton>
+                      <PermissionButton
+                        resource="products"
+                        action="delete"
                         className="text-red-600 hover:text-red-800"
                         onClick={() => { setBrandToDelete(brand); setShowDeleteConfirm(true); }}
                         disabled={loading}
                       >
                         <FaTrash />
-                      </button>
+                      </PermissionButton>
                     </div>
                   </td>
                 </tr>

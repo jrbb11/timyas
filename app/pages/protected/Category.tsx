@@ -3,6 +3,7 @@ import { FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../../components/ui/Modal';
 import { categoriesService } from '../../services/categoriesService';
+import { PermissionButton } from '../../components/PermissionComponents';
 
 type CategoryType = { id: string; name: string; description?: string; created_at?: string };
 
@@ -179,15 +180,16 @@ const Category = () => {
               />
             </div>
           </div>
-          <button
+          <PermissionButton
+            resource="products"
+            action="create"
             className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
             style={{minWidth: 120}}
             onClick={handleCreate}
             disabled={loading}
-            type="button"
           >
             + Create
-          </button>
+          </PermissionButton>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full text-sm">
@@ -210,20 +212,23 @@ const Category = () => {
                   <td className="p-3">{cat.name}</td>
                   <td className="p-3">{cat.description || ''}</td>
                   <td className="p-3 flex gap-2">
-                    <button
+                    <PermissionButton
+                      resource="products"
+                      action="update"
                       className="text-green-600 hover:text-green-800"
                       onClick={() => handleEdit(cat)}
                     >
                       <FaEdit />
-                    </button>
-                    <button
+                    </PermissionButton>
+                    <PermissionButton
+                      resource="products"
+                      action="delete"
                       className="text-red-600 hover:text-red-800"
                       onClick={() => { setCategoryToDelete(cat); setShowDeleteConfirm(true); }}
-                      ref={deleteButtonRef}
                       disabled={loading}
                     >
                       <FaTrash />
-                    </button>
+                    </PermissionButton>
                   </td>
                 </tr>
               ))}

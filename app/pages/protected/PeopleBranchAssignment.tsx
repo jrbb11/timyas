@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { supabase } from '../../utils/supabaseClient';
-import { FaCheck, FaEdit, FaTimes } from 'react-icons/fa';
+import { FaCheck, FaEdit, FaTimes, FaTrash } from 'react-icons/fa';
 
 const PeopleBranchAssignment = () => {
   const [people, setPeople] = useState<any[]>([]);
@@ -15,6 +15,9 @@ const PeopleBranchAssignment = () => {
   const [toast, setToast] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [branchSearch, setBranchSearch] = useState('');
+  const [personToDelete, setPersonToDelete] = useState<any | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -80,6 +83,38 @@ const PeopleBranchAssignment = () => {
     closeModal();
   };
 
+  const handleDeletePerson = async () => {
+    if (!personToDelete) return;
+    setDeleting(true);
+    
+    try {
+      // First delete all branch assignments for this person
+      await supabase.from('people_branches').delete().eq('person_id', personToDelete.id);
+      
+      // Then delete the person
+      const { error } = await supabase.from('people').delete().eq('id', personToDelete.id);
+      
+      if (error) {
+        setToast('Error deleting person: ' + error.message);
+      } else {
+        // Remove from local state
+        setPeople(prev => prev.filter(p => p.id !== personToDelete.id));
+        setAssignments(prev => {
+          const newAssignments = { ...prev };
+          delete newAssignments[personToDelete.id];
+          return newAssignments;
+        });
+        setToast('Person deleted successfully');
+      }
+    } catch (error) {
+      setToast('Error deleting person');
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+      setPersonToDelete(null);
+    }
+  };
+
   const filteredPeople = people.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
   const filteredBranches = branches.filter(b => b.name.toLowerCase().includes(branchSearch.toLowerCase()));
 
@@ -120,12 +155,23 @@ const PeopleBranchAssignment = () => {
                   <span className="text-gray-400 text-xs">No branches assigned</span>
                 )}
               </div>
-              <button
-                className="mt-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2 self-end"
-                onClick={() => openEditModal(person)}
-              >
-                <FaEdit /> Edit
-              </button>
+              <div className="mt-auto flex gap-2 justify-end">
+                <button
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                  onClick={() => openEditModal(person)}
+                >
+                  <FaEdit /> Edit
+                </button>
+                <button
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center gap-2"
+                  onClick={() => {
+                    setPersonToDelete(person);
+                    setShowDeleteConfirm(true);
+                  }}
+                >
+                  <FaTrash /> Delete
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -168,6 +214,42 @@ const PeopleBranchAssignment = () => {
             <div className="flex justify-end gap-2 mt-6">
               <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold" onClick={closeModal} disabled={saving}>Cancel</button>
               <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && personToDelete && (
+        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <FaTrash className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Delete Person</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete <strong>{personToDelete.name}</strong>? 
+              This will also remove all their branch assignments. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button 
+                className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-200"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setPersonToDelete(null);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50"
+                onClick={handleDeletePerson}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Modal from '../../components/ui/Modal';
 import { unitsService } from '../../services/unitsService';
 import UniversalSelect from '../../components/ui/UniversalSelect';
+import { PermissionButton } from '../../components/PermissionComponents';
 
 type UnitType = {
   id: string;
@@ -199,15 +200,16 @@ const Unit = () => {
               />
             </div>
           </div>
-          <button
+          <PermissionButton
+            resource="products"
+            action="create"
             className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
             style={{minWidth: 120}}
             onClick={handleCreate}
             disabled={loading}
-            type="button"
           >
             + Create
-          </button>
+          </PermissionButton>
         </div>
         <div className="overflow-x-auto bg-white rounded-lg shadow">
           <table className="min-w-full text-sm">
@@ -236,20 +238,24 @@ const Unit = () => {
                   <td className="p-3">{unit.operator}</td>
                   <td className="p-3">{unit.operation_value}</td>
                   <td className="p-3 flex gap-2">
-                    <button
+                    <PermissionButton
+                      resource="products"
+                      action="update"
                       className="text-green-600 hover:text-green-800"
                       onClick={() => handleEdit(unit)}
                       disabled={loading}
                     >
                       <FaEdit />
-                    </button>
-                    <button
+                    </PermissionButton>
+                    <PermissionButton
+                      resource="products"
+                      action="delete"
                       className="text-red-600 hover:text-red-800"
                       onClick={() => { setUnitToDelete(unit); setShowDeleteConfirm(true); }}
                       disabled={loading}
                     >
                       <FaTrash />
-                    </button>
+                    </PermissionButton>
                   </td>
                 </tr>
               ))}

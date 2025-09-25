@@ -4,6 +4,7 @@ import { accountsService } from '../../services/accountsService';
 import { supabase } from '../../utils/supabaseClient';
 import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 import UniversalSelect from '../../components/ui/UniversalSelect';
+import { PermissionGuard } from '../../components/PermissionComponents';
 
 type DepositType = { id: number; account: string; category: string; amount: number; date: string; description: string };
 
@@ -52,25 +53,48 @@ const Deposits = () => {
   };
 
   return (
-    <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-          <div className="flex-1 flex gap-2 items-center">
-            <div className="relative w-full max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                <FaSearch />
-              </span>
-              <input
-                type="text"
-                placeholder="Search deposits..."
-                className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
+    <PermissionGuard
+      resource="financial"
+      action="read"
+      fallback={
+        <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
+          <div className="p-6">
+            <div className="bg-white rounded-xl shadow p-12 text-center">
+              <div className="text-gray-400">
+                <div className="text-6xl mb-4">🔒</div>
+                <div className="text-xl font-semibold mb-2">Financial Data Access Restricted</div>
+                <div>You don't have permission to view deposits data</div>
+              </div>
             </div>
           </div>
-          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
-        </div>
+        </AdminLayout>
+      }
+    >
+      <AdminLayout title="Deposits" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Deposits</span></span>}>
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div className="flex-1 flex gap-2 items-center">
+              <div className="relative w-full max-w-xs">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FaSearch />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search deposits..."
+                  className="pl-10 pr-3 py-2 border border-gray-200 rounded-lg w-full text-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-purple-200 focus:border-purple-400 transition"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+            </div>
+            <PermissionGuard
+              resource="financial"
+              action="manage"
+              fallback={<div></div>}
+            >
+              <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
+            </PermissionGuard>
+          </div>
         <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
             <thead>
@@ -167,6 +191,7 @@ const Deposits = () => {
         )}
       </div>
     </AdminLayout>
+    </PermissionGuard>
   );
 };
 

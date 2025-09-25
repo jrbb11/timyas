@@ -4,6 +4,7 @@ import { accountsService } from '../../services/accountsService';
 import { supabase } from '../../utils/supabaseClient';
 import { FaSearch, FaEdit, FaTrash } from 'react-icons/fa';
 import UniversalSelect from '../../components/ui/UniversalSelect';
+import { PermissionGuard } from '../../components/PermissionComponents';
 
 type Account = { id: string; name: string };
 
@@ -70,7 +71,24 @@ const Transfers = () => {
   };
 
   return (
-    <AdminLayout title="Transfers" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Transfers</span></span>}>
+    <PermissionGuard
+      resource="financial"
+      action="read"
+      fallback={
+        <AdminLayout title="Transfers" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Transfers</span></span>}>
+          <div className="p-6">
+            <div className="bg-white rounded-xl shadow p-12 text-center">
+              <div className="text-gray-400">
+                <div className="text-6xl mb-4">🔒</div>
+                <div className="text-xl font-semibold mb-2">Financial Data Access Restricted</div>
+                <div>You don't have permission to view transfers data</div>
+              </div>
+            </div>
+          </div>
+        </AdminLayout>
+      }
+    >
+      <AdminLayout title="Transfers" breadcrumb={<span>Finance &gt; <span className="text-gray-900">Transfers</span></span>}>
       <div className="p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex-1 flex gap-2 items-center">
@@ -87,7 +105,13 @@ const Transfers = () => {
               />
             </div>
           </div>
-          <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
+          <PermissionGuard
+            resource="financial"
+            action="manage"
+            fallback={<div></div>}
+          >
+            <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={openCreate} type="button">+ Create</button>
+          </PermissionGuard>
         </div>
         <div className="bg-white rounded-xl shadow p-0 overflow-x-auto">
           <table className="min-w-full">
@@ -188,6 +212,7 @@ const Transfers = () => {
         )}
       </div>
     </AdminLayout>
+    </PermissionGuard>
   );
 };
 

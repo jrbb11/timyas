@@ -18,6 +18,7 @@ import { DateRange } from 'react-date-range';
 import { format } from 'date-fns';
 import { FaRegCalendarAlt } from 'react-icons/fa';
 import 'react-date-range/dist/styles.css';
+import { PermissionButton } from '../../components/PermissionComponents';
 import 'react-date-range/dist/theme/default.css';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
@@ -268,7 +269,15 @@ const AllPurchases = () => {
             </div>
             <div className="flex flex-wrap gap-2 justify-end w-full md:w-auto">
               <button className="border border-gray-300 text-gray-700 bg-white px-5 py-2 rounded-lg font-semibold hover:bg-gray-100 transition" onClick={handleExportCSV} type="button">Export Purchases</button>
-              <button className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto" style={{minWidth: 120}} onClick={() => navigate('/purchases/create')} type="button">+ Create</button>
+              <PermissionButton
+                resource="purchases"
+                action="create"
+                className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
+                style={{minWidth: 120}}
+                onClick={() => navigate('/purchases/create')}
+              >
+                + Create
+              </PermissionButton>
             </div>
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-0 overflow-x-auto">
@@ -322,22 +331,24 @@ const AllPurchases = () => {
                           >
                             <FaEye />
                           </button>
-                          <button
+                          <PermissionButton
+                            resource="purchases"
+                            action="update"
                             className="text-gray-500 hover:text-green-600 p-2 rounded-full transition"
                             onClick={() => handleEdit(purchase)}
-                            title="Edit"
                             disabled={loadingAction}
                           >
                             <FaEdit />
-                          </button>
-                          <button
+                          </PermissionButton>
+                          <PermissionButton
+                            resource="purchases"
+                            action="delete"
                             className="text-gray-500 hover:text-red-600 p-2 rounded-full transition"
                             onClick={() => { setPurchaseToDelete(purchase); setShowDeleteConfirm(true); }}
-                            title="Delete"
                             disabled={loadingAction}
                           >
                             <FaTrash />
-                          </button>
+                          </PermissionButton>
                         </div>
                       </td>
                     </tr>

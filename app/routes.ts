@@ -40,4 +40,8 @@ export default [
   route("SaleView", "pages/protected/SaleView.tsx"),
   route("not-approved", "pages/NotApproved.tsx"),
   route("admin/users", "pages/protected/AdminUsers.tsx"),
+  route("admin/users-enhanced", "pages/protected/AdminUsersEnhanced.tsx"),
+  route("rbac-test", "pages/protected/RBACTestPage.tsx"),
+  route("security/dashboard", "pages/protected/SecurityDashboard.tsx"),
+  route("security/audit-trail", "pages/protected/AuditTrailViewer.tsx"),
 ] satisfies RouteConfig;
