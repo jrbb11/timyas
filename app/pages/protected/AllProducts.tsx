@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../../components/ui/Modal';
 import Papa from 'papaparse';
 import { PermissionButton } from '../../components/PermissionComponents';
+import { getCurrentUser } from '../../utils/supabaseClient';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -165,7 +166,12 @@ const AllProducts = () => {
   const handleDelete = async () => {
     if (!productToDelete) return;
     setLoadingAction(true);
-    const { error } = await productsService.remove(productToDelete.id);
+    
+    // Get current user for audit logging
+    const user = await getCurrentUser();
+    console.log('Current user for product deletion:', user?.id, user?.email); // Debug log
+    
+    const { error } = await productsService.remove(productToDelete.id, user?.id);
     if (error) {
       setToast({ message: 'Delete failed: ' + error.message, type: 'error' });
     } else {

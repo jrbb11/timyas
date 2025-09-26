@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { customersService } from '../../services/customersService';
 import { branchesService } from '../../services/branchesService';
-import { supabase } from '../../utils/supabaseClient';
+import { supabase, getCurrentUser } from '../../utils/supabaseClient';
 
 type BranchForm = { name: string; code: string; address: string; city: string; country: string };
 
@@ -40,8 +40,13 @@ const FranchiseeCreate = () => {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    
+    // Get current user for audit logging
+    const user = await getCurrentUser();
+    console.log('Current user for franchisee creation:', user?.id, user?.email); // Debug log
+    
     // 1. Create franchisee
-    const { data: franchiseeRes, error: franchiseeError } = await customersService.create(form);
+    const { data: franchiseeRes, error: franchiseeError } = await customersService.create(form, user?.id);
     const franchiseeArr = franchiseeRes as { id: string }[] | null;
     if (franchiseeError || !franchiseeArr || !franchiseeArr[0]?.id) {
       setLoading(false);

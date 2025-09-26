@@ -4,6 +4,7 @@ declare module 'react-date-range';
 import AdminLayout from '../../layouts/AdminLayout';
 import { useEffect, useState, useRef } from 'react';
 import { purchasesService } from '../../services/purchasesService';
+import { getCurrentUser } from '../../utils/supabaseClient';
 import { suppliersService } from '../../services/suppliersService';
 import { warehousesService } from '../../services/warehousesService';
 import { FaEye, FaEdit, FaTrash, FaSearch } from 'react-icons/fa';
@@ -183,13 +184,24 @@ const AllPurchases = () => {
   const handleDelete = async () => {
     if (!purchaseToDelete) return;
     setLoadingAction(true);
-    // TODO: Implement delete logic for purchases
-    setTimeout(() => {
-      setToast({ message: 'Purchase deleted (stub)', type: 'success' });
-      setShowDeleteConfirm(false);
-      setPurchaseToDelete(null);
-      setLoadingAction(false);
-    }, 1000);
+    
+    // Get current user for audit logging
+    const user = await getCurrentUser();
+    console.log('Current user for purchase deletion:', user?.id, user?.email); // Debug log
+    
+    const { error } = await purchasesService.remove(purchaseToDelete.id, user?.id);
+    if (error) {
+      setToast({ message: 'Delete failed: ' + error.message, type: 'error' });
+    } else {
+      setToast({ message: 'Purchase deleted successfully!', type: 'success' });
+      // Refresh the purchases list
+      purchasesService.getAll().then(({ data, error }) => {
+        if (!error) setPurchases(data || []);
+      });
+    }
+    setShowDeleteConfirm(false);
+    setPurchaseToDelete(null);
+    setLoadingAction(false);
   };
   useEffect(() => {
     if (toast) {

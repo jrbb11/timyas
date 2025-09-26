@@ -124,12 +124,20 @@ const CreateSale = () => {
   useEffect(() => {
     if (!isEdit || !id) return;
     setLoadingAudit(true);
+    console.log('Fetching audit logs for sale ID:', id); // Debug log
     salesService.getAuditLogs(id as string).then(async ({ data, error }) => {
-      if (error) setAuditError(error.message);
-      else {
+      console.log('Audit logs response:', { data, error }); // Debug log
+      console.log('Sale ID being queried:', id); // Debug log
+      if (error) {
+        console.error('Audit logs error:', error);
+        setAuditError(error.message);
+      } else {
+        console.log('Setting audit logs:', data);
+        console.log('Number of audit logs found:', data?.length || 0); // Debug log
+        console.log('First audit log structure:', data?.[0]); // Debug the structure
         setAuditLogs(data || []);
         // Fetch user names for all user_ids in logs
-        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id).filter(Boolean)));
         if (userIds.length) {
           const users = await customersService.getUsersByIds(userIds);
           const map: Record<string, string> = {};
@@ -245,6 +253,7 @@ const CreateSale = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted, isEdit:', isEdit); // Debug log
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -257,6 +266,7 @@ const CreateSale = () => {
           setLoading(false);
           return;
         }
+        console.log('Current user for update:', user.id, user.email); // Debug log
         // Fetch old sale data for diff
         const { data: oldSale, error: oldError } = await salesService.getById(id as string);
         if (oldError) {
@@ -310,7 +320,11 @@ const CreateSale = () => {
         total_amount: grandTotal,
       };
       console.log('saleData', saleData);
-      const { data: saleRes, error: saleError } = await salesService.create(saleData) as unknown as { data: { id: string }[]; error: any };
+      // Get current user for audit logging
+      const user = await getCurrentUser();
+      console.log('Current user for sale creation:', user?.id, user?.email); // Debug log
+      
+      const { data: saleRes, error: saleError } = await salesService.create(saleData, user?.id) as unknown as { data: { id: string }[]; error: any };
       if (saleError || !saleRes || !saleRes[0]?.id) {
         console.error('saleError', saleError);
         setError(saleError?.message || 'Failed to create sale');
@@ -395,13 +409,34 @@ const CreateSale = () => {
                   <tbody>
                     {auditLogs.map((log, idx) => (
                       <tr key={log.id || idx} className="border-t">
-                        <td className="p-2 whitespace-nowrap">{new Date(log.created_at).toLocaleString()}</td>
-                        <td className="p-2 whitespace-nowrap">{userMap[log.user_id] || log.user_id}</td>
+                        <td className="p-2 whitespace-nowrap">{new Date(log.timestamp || log.log_timestamp || log.created_at).toLocaleString()}</td>
+                        <td className="p-2 whitespace-nowrap">{log.user_email || userMap[log.user_id] || log.user_id}</td>
                         <td className="p-2">
                           <ul className="list-disc ml-4">
-                            {Object.entries(JSON.parse(log.changes)).map(([field, change]: any) => (
-                              <li key={field}><b>{field}</b>: {String(change.from)} → {String(change.to)}</li>
-                            ))}
+                            {log.old_values && log.new_values ? (
+                              (() => {
+                                const changes = [];
+                                const oldKeys = Object.keys(log.old_values || {});
+                                const newKeys = Object.keys(log.new_values || {});
+                                const allKeys = [...new Set([...oldKeys, ...newKeys])];
+                                
+                                allKeys.forEach((field) => {
+                                  const oldValue = log.old_values?.[field];
+                                  const newValue = log.new_values?.[field];
+                                  if (oldValue !== newValue) {
+                                    changes.push(
+                                      <li key={field}>
+                                        <b>{field}</b>: {String(oldValue || 'null')} → {String(newValue || 'null')}
+                                      </li>
+                                    );
+                                  }
+                                });
+                                
+                                return changes.length > 0 ? changes : <li>No changes recorded</li>;
+                              })()
+                            ) : (
+                              <li>No changes recorded</li>
+                            )}
                           </ul>
                         </td>
                       </tr>
@@ -434,6 +469,7 @@ const CreateSale = () => {
               <label className="block text-sm font-medium mb-1">Customer & Branch *</label>
               <Select
                 classNamePrefix="react-select"
+                instanceId="customer-branch-select"
                 options={peopleBranches.map(pb => ({
                   value: pb.id,
                   label: pb.person_name,
@@ -712,7 +748,7 @@ const CreateSale = () => {
               <div className="flex justify-between font-bold text-lg"><span>Grand Total</span><span>₱ {grandTotal.toFixed(2)}</span></div>
             </div>
           </div>
-          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading || (!isEditable && !canEditStatus)}>
+          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading || !isStatusEditable}>
             {loading ? 'Saving...' : 'Submit'}
           </button>
           {error && <div className="text-red-500 mt-2">{error}</div>}

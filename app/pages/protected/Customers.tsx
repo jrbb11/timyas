@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 // @ts-ignore
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../../utils/supabaseClient';
+import { supabase, getCurrentUser } from '../../utils/supabaseClient';
 
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
@@ -177,7 +177,12 @@ const Customers = () => {
   const handleDelete = async () => {
     if (!customerToDelete) return;
     setLoadingAction(true);
-    const { error } = await customersService.remove(customerToDelete.id);
+    
+    // Get current user for audit logging
+    const user = await getCurrentUser();
+    console.log('Current user for customer deletion:', user?.id, user?.email); // Debug log
+    
+    const { error } = await customersService.remove(customerToDelete.id, user?.id);
     if (error) {
       setToast({ message: error.message, type: 'error' });
     } else {

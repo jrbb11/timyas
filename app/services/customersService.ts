@@ -7,46 +7,70 @@ export const customersService = {
   async getById(id: string) {
     return supabase.from('people').select('*').eq('id', id).eq('type', 'customer').single();
   },
-  async create(data: any) {
-    // Ensure type is set to 'customer' when creating
-    return supabase.from('people').insert([{ ...data, type: 'customer' }]);
+  async create(data: any, userId?: string) {
+    // Use the new function that sets user context and performs insert in same session
+    if (userId) {
+      console.log('Creating customer with user context:', userId); // Debug log
+      const { data: result, error } = await supabase.rpc('create_customer_with_user_context', {
+        p_user_id: userId,
+        p_data: data
+      });
+      return { data: result, error };
+    } else {
+      // Fallback to regular insert if no user ID provided
+      return supabase.from('people').insert([{ ...data, type: 'customer' }]);
+    }
   },
   async update(id: string, data: any, userId?: string, oldData?: any) {
-    const { error } = await supabase.from('people').update(data).eq('id', id);
-    if (!error && userId && oldData) {
-      const changes: Record<string, { from: any; to: any }> = {};
-      for (const key in data) {
-        if (data[key] !== oldData[key]) {
-          changes[key] = { from: oldData[key], to: data[key] };
-        }
-      }
-      if (Object.keys(changes).length > 0) {
-        await this.logEdit(id, userId, changes);
-      }
+    // Use the new function that sets user context and performs update in same session
+    if (userId) {
+      console.log('Updating customer with user context:', userId); // Debug log
+      const { error } = await supabase.rpc('update_customer_with_user_context', {
+        p_customer_id: id,
+        p_user_id: userId,
+        p_data: data
+      });
+      return { error };
+    } else {
+      // Fallback to regular update if no user ID provided
+      const { error } = await supabase.from('people').update(data).eq('id', id);
+      return { error };
     }
-    return { error };
   },
   async logEdit(customerId: string, userId: string, changes: any) {
-    return supabase.from('audit_logs').insert([
-      {
-        entity: 'customer',
-        entity_id: customerId,
-        user_id: userId,
-        changes: JSON.stringify(changes),
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    // Use the new audit system function
+    return supabase.rpc('log_data_change', {
+      p_user_id: userId,
+      p_action: 'UPDATE',
+      p_resource: 'people',
+      p_resource_id: customerId,
+      p_resource_name: `Customer ${customerId}`,
+      p_old_values: changes.old || null,
+      p_new_values: changes.new || null
+    });
   },
   async getAuditLogs(customerId: string) {
-    return supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity', 'customer')
-      .eq('entity_id', customerId)
-      .order('created_at', { ascending: false });
+    // Use the new audit system function
+    return supabase.rpc('get_audit_trail', {
+      p_resource: 'people',
+      p_resource_id: customerId,
+      p_limit: 100,
+      p_offset: 0
+    });
   },
-  async remove(id: string) {
-    return supabase.from('people').delete().eq('id', id).eq('type', 'customer');
+  async remove(id: string, userId?: string) {
+    // Use the new function that sets user context and performs delete in same session
+    if (userId) {
+      console.log('Deleting customer with user context:', userId); // Debug log
+      const { error } = await supabase.rpc('delete_customer_with_user_context', {
+        p_customer_id: id,
+        p_user_id: userId
+      });
+      return { error };
+    } else {
+      // Fallback to regular delete if no user ID provided
+      return supabase.from('people').delete().eq('id', id).eq('type', 'customer');
+    }
   },
   async getUsersByIds(userIds: string[]): Promise<any[]> {
     if (!userIds.length) return [];

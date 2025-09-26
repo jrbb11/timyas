@@ -6,6 +6,7 @@ import { brandsService } from '../../services/brandsService';
 import { categoriesService } from '../../services/categoriesService';
 import { unitsService } from '../../services/unitsService';
 import { customersService } from '../../services/customersService';
+import { getCurrentUser } from '../../utils/supabaseClient';
 
 const CreateProduct = () => {
   const { id } = useParams();
@@ -74,15 +75,20 @@ const CreateProduct = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
+    
+    // Get current user for audit logging
+    const user = await getCurrentUser();
+    console.log('Current user for product operation:', user?.id, user?.email); // Debug log
+    
     if (isEdit) {
-      const { error } = await productsService.update(id as string, form);
+      const { error } = await productsService.update(id as string, form, user?.id);
       if (error) setError(error.message);
       else {
         setSuccess('Product updated! Redirecting...');
         setTimeout(() => navigate('/products/all'), 1200);
       }
     } else {
-      const { error } = await productsService.create(form);
+      const { error } = await productsService.create(form, user?.id);
       if (error) setError(error.message);
       else {
         setSuccess('Product created! Redirecting...');

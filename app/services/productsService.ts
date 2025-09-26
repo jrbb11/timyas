@@ -15,45 +15,70 @@ export const productsService = {
   async getById(id: string) {
     return supabase.from('products').select('*').eq('id', id).single();
   },
-  async create(data: any) {
-    return supabase.from('products').insert([data]);
+  async create(data: any, userId?: string) {
+    // Use the new function that sets user context and performs insert in same session
+    if (userId) {
+      console.log('Creating product with user context:', userId); // Debug log
+      const { data: result, error } = await supabase.rpc('create_product_with_user_context', {
+        p_user_id: userId,
+        p_data: data
+      });
+      return { data: result, error };
+    } else {
+      // Fallback to regular insert if no user ID provided
+      return supabase.from('products').insert([data]);
+    }
   },
   async update(id: string, data: any, userId?: string, oldData?: any) {
-    const { error } = await supabase.from('products').update(data).eq('id', id);
-    if (!error && userId && oldData) {
-      const changes: Record<string, { from: any; to: any }> = {};
-      for (const key in data) {
-        if (data[key] !== oldData[key]) {
-          changes[key] = { from: oldData[key], to: data[key] };
-        }
-      }
-      if (Object.keys(changes).length > 0) {
-        await this.logEdit(id, userId, changes);
-      }
+    // Use the new function that sets user context and performs update in same session
+    if (userId) {
+      console.log('Updating product with user context:', userId); // Debug log
+      const { error } = await supabase.rpc('update_product_with_user_context', {
+        p_product_id: id,
+        p_user_id: userId,
+        p_data: data
+      });
+      return { error };
+    } else {
+      // Fallback to regular update if no user ID provided
+      const { error } = await supabase.from('products').update(data).eq('id', id);
+      return { error };
     }
-    return { error };
   },
   async logEdit(productId: string, userId: string, changes: any) {
-    return supabase.from('audit_logs').insert([
-      {
-        entity: 'product',
-        entity_id: productId,
-        user_id: userId,
-        changes: JSON.stringify(changes),
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    // Use the new audit system function
+    return supabase.rpc('log_data_change', {
+      p_user_id: userId,
+      p_action: 'UPDATE',
+      p_resource: 'products',
+      p_resource_id: productId,
+      p_resource_name: `Product ${productId}`,
+      p_old_values: changes.old || null,
+      p_new_values: changes.new || null
+    });
   },
   async getAuditLogs(productId: string) {
-    return supabase
-      .from('audit_logs')
-      .select('*')
-      .eq('entity', 'product')
-      .eq('entity_id', productId)
-      .order('created_at', { ascending: false });
+    // Use the new audit system function
+    return supabase.rpc('get_audit_trail', {
+      p_resource: 'products',
+      p_resource_id: productId,
+      p_limit: 100,
+      p_offset: 0
+    });
   },
-  async remove(id: string) {
-    return supabase.from('products').delete().eq('id', id);
+  async remove(id: string, userId?: string) {
+    // Use the new function that sets user context and performs delete in same session
+    if (userId) {
+      console.log('Deleting product with user context:', userId); // Debug log
+      const { error } = await supabase.rpc('delete_product_with_user_context', {
+        p_product_id: id,
+        p_user_id: userId
+      });
+      return { error };
+    } else {
+      // Fallback to regular delete if no user ID provided
+      return supabase.from('products').delete().eq('id', id);
+    }
   },
   async getStockView() {
     return supabase.from('product_stock_view').select('*');

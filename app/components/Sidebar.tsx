@@ -83,6 +83,9 @@ const menu = [
     items: [
       { label: 'Security Dashboard', icon: <FaShieldAlt />, path: '/security/dashboard', permission: { resource: 'security', action: 'read' } },
       { label: 'Audit Trail', icon: <FaFile />, path: '/security/audit-trail', permission: { resource: 'audit', action: 'read' } },
+      { label: 'Security Alerts', icon: <FaShieldAlt />, path: '/security/alerts', permission: { resource: 'security', action: 'read' } },
+      { label: 'User Activity', icon: <FaUsers />, path: '/security/user-activity', permission: { resource: 'audit', action: 'read' } },
+      { label: 'Compliance Reports', icon: <FaFile />, path: '/security/compliance', permission: { resource: 'audit', action: 'export' } },
     ]
   }
 ];

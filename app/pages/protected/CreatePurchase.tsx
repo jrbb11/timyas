@@ -7,6 +7,7 @@ import { productsService } from '../../services/productsService';
 import { FaEdit, FaTrash, FaPlus, FaMinus } from 'react-icons/fa';
 import Modal from '../../components/ui/Modal';
 import { purchasesService } from '../../services/purchasesService';
+import { getCurrentUser } from '../../utils/supabaseClient';
 import { purchaseItemsService } from '../../services/purchaseItemsService';
 
 const CreatePurchase = () => {
@@ -260,7 +261,11 @@ const CreatePurchase = () => {
           note,
           total_amount: grandTotal,
         };
-        const { data: purchaseRes, error: purchaseError } = await purchasesService.create(purchaseData) as unknown as { data: { id: string }[]; error: any };
+        // Get current user for audit logging
+        const user = await getCurrentUser();
+        console.log('Current user for purchase creation:', user?.id, user?.email); // Debug log
+        
+        const { data: purchaseRes, error: purchaseError } = await purchasesService.create(purchaseData, user?.id) as unknown as { data: { id: string }[]; error: any };
         if (purchaseError || !purchaseRes || !purchaseRes[0]?.id) {
           console.error('purchaseError', purchaseError);
           setError(purchaseError?.message || 'Failed to create purchase');

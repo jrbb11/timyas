@@ -44,4 +44,7 @@ export default [
   route("rbac-test", "pages/protected/RBACTestPage.tsx"),
   route("security/dashboard", "pages/protected/SecurityDashboard.tsx"),
   route("security/audit-trail", "pages/protected/AuditTrailViewer.tsx"),
+  route("security/alerts", "pages/protected/SecurityAlerts.tsx"),
+  route("security/user-activity", "pages/protected/UserActivityMonitor.tsx"),
+  route("security/compliance", "pages/protected/ComplianceReports.tsx"),
 ] satisfies RouteConfig;
