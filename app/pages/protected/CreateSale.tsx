@@ -10,12 +10,14 @@ import { salesService } from '../../services/salesService';
 import { saleItemsService } from '../../services/saleItemsService';
 import { getCurrentUser } from '../../utils/supabaseClient';
 import { supabase } from '../../utils/supabaseClient';
+import { useRBAC } from '../../services/rbacService';
 import Select from 'react-select';
 
 const CreateSale = () => {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
+  const { isOwner, isAdmin } = useRBAC();
 
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
@@ -341,6 +343,10 @@ const CreateSale = () => {
 
   const lockedStatuses = ['delivered', 'cancel'];
   const isEditable = isEdit ? (['order_placed', 'for_delivery'].includes(status) && paymentStatus !== 'paid' && !lockedStatuses.includes(status)) : true;
+  
+  // Allow Owners and Admins to edit status even when sale is locked
+  const canEditStatus = isOwner || isAdmin;
+  const isStatusEditable = isEdit ? (isEditable || canEditStatus) : true;
 
   return (
     <AdminLayout
@@ -356,9 +362,14 @@ const CreateSale = () => {
             <b>Warning:</b> Editing sales is allowed only for pending/draft sales. All changes are logged for audit purposes.
           </div>
         )}
-        {isEdit && !isEditable && (
+        {isEdit && !isEditable && !canEditStatus && (
           <div className="mb-4 p-3 bg-red-100 border-l-4 border-red-500 text-red-800 rounded">
             <b>Locked:</b> This sale cannot be edited because it is delivered, paid, or cancelled. For major changes, use a return or credit note.
+          </div>
+        )}
+        {isEdit && !isEditable && canEditStatus && (
+          <div className="mb-4 p-3 bg-blue-100 border-l-4 border-blue-500 text-blue-800 rounded">
+            <b>Admin Override:</b> You have permission to edit this sale's status. Other fields remain locked for audit purposes.
           </div>
         )}
         {/* Audit log placeholder */}
@@ -411,7 +422,7 @@ const CreateSale = () => {
               value={invoiceNumber}
               onChange={e => setInvoiceNumber(e.target.value)}
               required
-              disabled={!isEditable}
+              disabled={!isEditable && !canEditStatus}
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -667,6 +678,7 @@ const CreateSale = () => {
                 value={status}
                 onChange={e => setStatus(e.target.value)}
                 required
+                disabled={!isStatusEditable}
               >
                 <option value="order_placed">Order Placed</option>
                 <option value="for_delivery">For Delivery</option>
@@ -700,7 +712,7 @@ const CreateSale = () => {
               <div className="flex justify-between font-bold text-lg"><span>Grand Total</span><span>₱ {grandTotal.toFixed(2)}</span></div>
             </div>
           </div>
-          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading || !isEditable}>
+          <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700" disabled={loading || (!isEditable && !canEditStatus)}>
             {loading ? 'Saving...' : 'Submit'}
           </button>
           {error && <div className="text-red-500 mt-2">{error}</div>}
