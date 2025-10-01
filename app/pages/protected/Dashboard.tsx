@@ -593,14 +593,36 @@ const Dashboard = () => {
               <div className="bg-white shadow rounded-lg p-6 flex flex-col">
                 <h2 className="text-lg font-semibold mb-4">Sales by product category</h2>
                 <div className="flex-1 flex flex-col items-center justify-center">
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
+                  <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                      <Pie
+                        data={pieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        paddingAngle={2}
+                        label={false}
+                        labelLine={false}
+                      >
                         {pieData.map((entry, idx) => (
                           <Cell key={`cell-${idx}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Legend layout="vertical" align="right" verticalAlign="middle" />
+                      <Tooltip
+                        formatter={(value: any) => `₱${Number(value).toLocaleString()}`}
+                      />
+                      <Legend
+                        layout="vertical"
+                        align="right"
+                        verticalAlign="middle"
+                        formatter={(value: any, entry: any) => {
+                          const item = pieData.find(p => p.name === value);
+                          const amount = item ? `₱${Number(item.value).toLocaleString()}` : '';
+                          return `${value} — ${amount}`;
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>

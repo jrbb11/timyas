@@ -2,6 +2,7 @@ import AdminLayout from '../../layouts/AdminLayout';
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { warehousesService } from '../../services/warehousesService';
+import { supabase } from '../../utils/supabaseClient';
 import { productsService } from '../../services/productsService';
 import { adjustmentBatchesService } from '../../services/adjustmentBatchesService';
 import { productAdjustmentsService } from '../../services/productAdjustmentsService';
@@ -218,6 +219,23 @@ const CreateStockAdjustment = () => {
     setError(null);
     setSuccess(null);
     try {
+      // Resolve current user -> people.id for adjusted_by
+      let adjustedByPersonId: string | null = null;
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userId = auth?.user?.id;
+        if (userId) {
+          const { data: person } = await supabase
+            .from('people')
+            .select('id')
+            .eq('user_id', userId)
+            .limit(1)
+            .single();
+          adjustedByPersonId = person?.id || null;
+        }
+      } catch (_) {
+        // ignore – fallback to null shows as "System"
+      }
       let batchId = id;
       if (!isEdit) {
         // Create adjustment batch
@@ -226,6 +244,7 @@ const CreateStockAdjustment = () => {
           reason,
           warehouse: selectedWarehouse,
           adjusted_at: date,
+          adjusted_by: adjustedByPersonId,
         };
         const { data: batchRes, error: batchError } = await adjustmentBatchesService.create(batchData);
         if (batchError || !batchRes || !(batchRes as any[])[0]?.id) {
@@ -241,6 +260,7 @@ const CreateStockAdjustment = () => {
           reason,
           warehouse: selectedWarehouse,
           adjusted_at: date,
+          adjusted_by: adjustedByPersonId,
         };
         await adjustmentBatchesService.update(id as string, batchData);
       }
@@ -266,6 +286,7 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: subItem.before_stock,
             after_stock: subItem.after_stock,
+            adjusted_by: adjustedByPersonId,
             unit_cost: subItem.unit_cost || 0,
             total_cost: subItem.total_cost || 0,
           },
@@ -276,6 +297,7 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: currentStocks[marinatedChicken.id] || 0,
             after_stock: (currentStocks[marinatedChicken.id] || 0) + subItem.quantity,
+            adjusted_by: adjustedByPersonId,
             unit_cost: marinatedChicken.product_cost || 0,
             total_cost: (marinatedChicken.product_cost || 0) * subItem.quantity,
           },
@@ -301,6 +323,7 @@ const CreateStockAdjustment = () => {
           quantity: item.quantity,
           before_stock: item.before_stock,
           after_stock: item.after_stock,
+          adjusted_by: adjustedByPersonId,
           unit_cost: item.unit_cost || 0,
           total_cost: item.total_cost || 0,
         }));
