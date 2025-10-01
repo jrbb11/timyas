@@ -960,10 +960,8 @@ const Reports = () => {
                         <td className={`p-3 text-right font-bold ${row.marinated_ending < 0 ? 'text-red-600' : row.marinated_ending === 0 ? 'text-gray-400' : 'text-green-700'}`}>
                           {row.marinated_ending}
                         </td>
-                        <td className="p-3 text-sm">
-                          <span className={row.alert_message ? 'text-red-700' : 'text-gray-400'}>
-                            {row.alert_message || '-'}
-                          </span>
+                        <td className="p-3 text-sm text-red-700">
+                          {row.alert_message || '-'}
                         </td>
                       </tr>
                     );
