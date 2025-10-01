@@ -34,6 +34,8 @@ const StockMovementHistory = () => {
   }, []);
 
   useEffect(() => {
+    // Reset to first page whenever filters change
+    setCurrentPage(0);
     loadMovements();
   }, [selectedProduct, selectedWarehouse, dateFrom, dateTo, movementType]);
 
@@ -42,12 +44,15 @@ const StockMovementHistory = () => {
     try {
       let movementsData: any[] = [];
 
+      // Ensure end date includes the whole day
+      const dateToEnd = dateTo ? `${dateTo} 23:59:59` : undefined;
+
       if (movementType === 'all' || movementType === 'adjustments') {
         const { data: adjustments } = await stockMovementService.getMovementHistory(
           selectedProduct || undefined,
           selectedWarehouse || undefined,
           dateFrom || undefined,
-          dateTo || undefined
+          dateToEnd
         );
         movementsData.push(...(adjustments || []).map((item: any) => ({
           ...item,
@@ -65,7 +70,7 @@ const StockMovementHistory = () => {
           selectedProduct || undefined,
           selectedWarehouse || undefined,
           dateFrom || undefined,
-          dateTo || undefined
+          dateToEnd
         );
         movementsData.push(...(purchases || []).map((item: any) => ({
           ...item,
@@ -83,7 +88,7 @@ const StockMovementHistory = () => {
           selectedProduct || undefined,
           selectedWarehouse || undefined,
           dateFrom || undefined,
-          dateTo || undefined
+          dateToEnd
         );
         movementsData.push(...(sales || []).map((item: any) => ({
           ...item,

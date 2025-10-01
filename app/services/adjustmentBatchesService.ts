@@ -29,6 +29,9 @@ export const adjustmentBatchesService = {
     return supabase.from('adjustment_batches').update(data).eq('id', id);
   },
   async remove(id: string) {
+    // Manually delete product_adjustments first to avoid calling trigger functions directly
+    const delItems = await supabase.from('product_adjustments').delete().eq('adjustment_batch_id', id);
+    if (delItems.error) return { error: delItems.error } as any;
     return supabase.from('adjustment_batches').delete().eq('id', id);
   },
 }; 

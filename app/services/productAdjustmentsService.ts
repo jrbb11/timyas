@@ -39,6 +39,9 @@ export const productAdjustmentsService = {
   async createMany(data: any[]) {
     return supabase.from('product_adjustments').insert(data);
   },
+  async removeByBatchId(batchId: string) {
+    return supabase.from('product_adjustments').delete().eq('adjustment_batch_id', batchId);
+  },
   async update(id: string, data: any) {
     return supabase.from('product_adjustments').update(data).eq('id', id);
   },

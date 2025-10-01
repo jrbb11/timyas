@@ -21,11 +21,11 @@ export const stockMovementService = {
     }
 
     if (dateFrom) {
-      query = query.gte('adjusted_at', dateFrom);
+      query = query.gte('adjusted_at', `${dateFrom} 00:00:00`);
     }
 
     if (dateTo) {
-      query = query.lte('adjusted_at', dateTo);
+      query = query.lte('adjusted_at', `${dateTo} 23:59:59`);
     }
 
     return query;
@@ -50,11 +50,11 @@ export const stockMovementService = {
     }
 
     if (dateFrom) {
-      query = query.gte('purchase.date', dateFrom);
+      query = query.gte('purchase.date', `${dateFrom} 00:00:00`);
     }
 
     if (dateTo) {
-      query = query.lte('purchase.date', dateTo);
+      query = query.lte('purchase.date', `${dateTo} 23:59:59`);
     }
 
     return query;
@@ -79,11 +79,11 @@ export const stockMovementService = {
     }
 
     if (dateFrom) {
-      query = query.gte('sale.date', dateFrom);
+      query = query.gte('sale.date', `${dateFrom} 00:00:00`);
     }
 
     if (dateTo) {
-      query = query.lte('sale.date', dateTo);
+      query = query.lte('sale.date', `${dateTo} 23:59:59`);
     }
 
     return query;
