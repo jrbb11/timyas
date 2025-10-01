@@ -94,6 +94,8 @@ const CreateStockAdjustment = () => {
         quantity: item.quantity,
         before_stock: item.before_stock,
         after_stock: item.after_stock,
+        unit_cost: item.unit_cost || 0,
+        total_cost: item.total_cost || 0,
       })));
       setLoading(false);
     });
@@ -118,6 +120,8 @@ const CreateStockAdjustment = () => {
         quantity: marinationQty,
         before_stock: currentStock,
         after_stock: currentStock - marinationQty,
+        unit_cost: product.product_cost || 0,
+        total_cost: (product.product_cost || 0) * marinationQty,
       };
       setAdjustmentItems([subItem]);
       setProductSearch('');
@@ -136,6 +140,8 @@ const CreateStockAdjustment = () => {
       quantity: 0,
       before_stock: currentStock,
       after_stock: currentStock,
+      unit_cost: product.product_cost || 0,
+      total_cost: 0,
     };
     setAdjustmentItems([...adjustmentItems, newItem]);
     setProductSearch('');
@@ -147,8 +153,18 @@ const CreateStockAdjustment = () => {
   useEffect(() => {
     if (reason === 'Production/Marination' && adjustmentItems.length === 2) {
       const [subItem, addItem] = adjustmentItems;
-      const newSub = { ...subItem, quantity: marinationQty, after_stock: subItem.before_stock - marinationQty };
-      const newAdd = { ...addItem, quantity: marinationQty, after_stock: addItem.before_stock + marinationQty };
+      const newSub = { 
+        ...subItem, 
+        quantity: marinationQty, 
+        after_stock: subItem.before_stock - marinationQty,
+        total_cost: (subItem.unit_cost || 0) * marinationQty,
+      };
+      const newAdd = { 
+        ...addItem, 
+        quantity: marinationQty, 
+        after_stock: addItem.before_stock + marinationQty,
+        total_cost: (addItem.unit_cost || 0) * marinationQty,
+      };
       setAdjustmentItems([newSub, newAdd]);
     }
     // eslint-disable-next-line
@@ -168,14 +184,18 @@ const CreateStockAdjustment = () => {
     if (editItemIdx === null) return;
     const updatedItems = [...adjustmentItems];
     const item = updatedItems[editItemIdx];
+    const quantity = Number(editForm.quantity);
+    const unitCost = Number(editForm.unit_cost) || 0;
     const newAfterStock = item.type === 'addition' 
-      ? item.before_stock + Number(editForm.quantity)
-      : item.before_stock - Number(editForm.quantity);
+      ? item.before_stock + quantity
+      : item.before_stock - quantity;
     
     updatedItems[editItemIdx] = {
       ...item,
       type: editForm.type,
-      quantity: Number(editForm.quantity),
+      quantity: quantity,
+      unit_cost: unitCost,
+      total_cost: quantity * unitCost,
       after_stock: newAfterStock,
     };
     setAdjustmentItems(updatedItems);
@@ -246,6 +266,8 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: subItem.before_stock,
             after_stock: subItem.after_stock,
+            unit_cost: subItem.unit_cost || 0,
+            total_cost: subItem.total_cost || 0,
           },
           {
             adjustment_batch_id: batchId,
@@ -254,6 +276,8 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: currentStocks[marinatedChicken.id] || 0,
             after_stock: (currentStocks[marinatedChicken.id] || 0) + subItem.quantity,
+            unit_cost: marinatedChicken.product_cost || 0,
+            total_cost: (marinatedChicken.product_cost || 0) * subItem.quantity,
           },
         ];
         // Debug log
@@ -277,6 +301,8 @@ const CreateStockAdjustment = () => {
           quantity: item.quantity,
           before_stock: item.before_stock,
           after_stock: item.after_stock,
+          unit_cost: item.unit_cost || 0,
+          total_cost: item.total_cost || 0,
         }));
         await productAdjustmentsService.createMany(items);
         setSuccess('Stock adjustment created successfully!');
@@ -432,6 +458,8 @@ const CreateStockAdjustment = () => {
                     <th className="p-2 text-left font-semibold">Current Stock</th>
                     <th className="p-2 text-left font-semibold">Type</th>
                     <th className="p-2 text-left font-semibold">Quantity</th>
+                    <th className="p-2 text-right font-semibold">Unit Cost</th>
+                    <th className="p-2 text-right font-semibold">Total Cost</th>
                     <th className="p-2 text-left font-semibold">New Stock</th>
                     <th className="p-2 text-center font-semibold">Actions</th>
                   </tr>
@@ -439,7 +467,7 @@ const CreateStockAdjustment = () => {
                 <tbody>
                   {adjustmentItems.length === 0 ? (
                     <tr>
-                      <td className="p-2 text-center text-gray-400" colSpan={7}>No items added</td>
+                      <td className="p-2 text-center text-gray-400" colSpan={9}>No items added</td>
                     </tr>
                   ) : (
                     adjustmentItems.map((item, idx) => (
@@ -455,16 +483,18 @@ const CreateStockAdjustment = () => {
                           </span>
                         </td>
                         <td className="p-2">
-                          {reason === 'Production/Marination' && (item.name?.toLowerCase() === 'chicken' || item.name?.toLowerCase().includes('marinated'))
-                            ? <span className="font-bold text-lg">{item.quantity}</span>
-                            : <span className="font-bold text-lg">{item.quantity}</span>
-                          }
+                          <span className={`inline-block text-xs px-2 py-0.5 rounded ${item.type === 'addition' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {item.type === 'addition' ? 'Addition' : 'Subtraction'}
+                          </span>
                         </td>
                         <td className="p-2">
-                          {reason === 'Production/Marination' && (item.name?.toLowerCase() === 'chicken' || item.name?.toLowerCase().includes('marinated'))
-                            ? <span className={`inline-block text-xs px-2 py-0.5 rounded ${item.type === 'addition' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.type === 'addition' ? 'Addition' : 'Subtraction'}</span>
-                            : <span className={`inline-block text-xs px-2 py-0.5 rounded ${item.type === 'addition' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{item.type === 'addition' ? 'Addition' : 'Subtraction'}</span>
-                          }
+                          <span className="font-bold text-lg">{item.quantity}</span>
+                        </td>
+                        <td className="p-2 text-right">
+                          <span className="text-sm">₱{(item.unit_cost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </td>
+                        <td className="p-2 text-right">
+                          <span className="font-semibold text-sm text-blue-700">₱{(item.total_cost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </td>
                         <td className="p-2">
                           <span className={`inline-block text-xs px-2 py-0.5 rounded ${
@@ -510,6 +540,17 @@ const CreateStockAdjustment = () => {
                     ))
                   )}
                 </tbody>
+                {adjustmentItems.length > 0 && (
+                  <tfoot className="bg-gray-200">
+                    <tr>
+                      <td colSpan={6} className="p-2 text-right font-bold">GRAND TOTAL:</td>
+                      <td className="p-2 text-right font-bold text-blue-700">
+                        ₱{adjustmentItems.reduce((sum, item) => sum + (item.total_cost || 0), 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
@@ -571,16 +612,43 @@ const CreateStockAdjustment = () => {
                 value={editForm.quantity || 0}
                 onChange={e => {
                   const quantity = Number(e.target.value);
+                  const unitCost = Number(editForm.unit_cost) || 0;
                   const newAfterStock = editForm.type === 'addition' 
                     ? editForm.before_stock + quantity
                     : editForm.before_stock - quantity;
                   setEditForm({
                     ...editForm, 
                     quantity,
+                    total_cost: quantity * unitCost,
                     after_stock: newAfterStock
                   });
                 }}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Unit Cost (₱)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full border rounded px-3 py-2"
+                value={editForm.unit_cost || 0}
+                onChange={e => {
+                  const unitCost = Number(e.target.value);
+                  const quantity = Number(editForm.quantity) || 0;
+                  setEditForm({
+                    ...editForm, 
+                    unit_cost: unitCost,
+                    total_cost: quantity * unitCost
+                  });
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Total Cost (₱)</label>
+              <div className="p-2 bg-gray-100 rounded font-semibold text-blue-700">
+                ₱{(editForm.total_cost || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">New Stock</label>
