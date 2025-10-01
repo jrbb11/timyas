@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { FaChartBar, FaCalendarAlt, FaFileCsv, FaBoxes, FaTags, FaTrademark, FaBalanceScale, FaUsers } from 'react-icons/fa';
+import { FaChartBar, FaCalendarAlt, FaFileCsv, FaBoxes, FaTags, FaTrademark, FaBalanceScale, FaUsers, FaWarehouse } from 'react-icons/fa';
 import ReportSummaryCard from '../../components/ui/ReportSummaryCard';
 import { salesService } from '../../services/salesService';
 import { purchasesService } from '../../services/purchasesService';
@@ -32,6 +32,7 @@ const Reports = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [saleItems, setSaleItems] = useState<any[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<any[]>([]);
+  const [adjustments, setAdjustments] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -47,6 +48,7 @@ const Reports = () => {
       customersService.getAll(),
       supabase.from('sale_items').select('*, product:products(id, name, code), sale:sales(id, date)'),
       supabase.from('purchase_items').select('*, product:products(id, name, code), purchase:purchases(id, date)'),
+      supabase.from('product_adjustments').select('*, product:products(id, name, code), adjustment_batch:adjustment_batches(id, adjusted_at)'),
     ])
       .then(([
         salesRes,
@@ -59,6 +61,7 @@ const Reports = () => {
         customersRes,
         saleItemsRes,
         purchaseItemsRes,
+        adjustmentsRes,
       ]) => {
         if (salesRes.error) throw salesRes.error;
         if (purchasesRes.error) throw purchasesRes.error;
@@ -70,6 +73,7 @@ const Reports = () => {
         if (customersRes.error) throw customersRes.error;
         if (saleItemsRes.error) throw saleItemsRes.error;
         if (purchaseItemsRes.error) throw purchaseItemsRes.error;
+        if (adjustmentsRes.error) throw adjustmentsRes.error;
         setSales(salesRes.data || []);
         setPurchases(purchasesRes.data || []);
         setExpenses(expensesRes.data || []);
@@ -80,6 +84,7 @@ const Reports = () => {
         setCustomers(customersRes.data || []);
         setSaleItems(saleItemsRes.data || []);
         setPurchaseItems(purchaseItemsRes.data || []);
+        setAdjustments(adjustmentsRes.data || []);
       })
       .catch((err) => setError(err.message || 'Failed to load data'))
       .finally(() => setLoading(false));
@@ -288,6 +293,256 @@ const Reports = () => {
 
   const totalProductPurchases = productPurchaseReport.reduce((sum, item) => sum + item.total_amount, 0);
   const totalProductPurchasesQty = productPurchaseReport.reduce((sum, item) => sum + item.total_qty, 0);
+
+  // Section: Monthly Inventory Balance Report with Variance Analysis
+  const monthlyInventoryBalance = useMemo(() => {
+    // Collect all transactions with details
+    type Transaction = {
+      product_id: string;
+      product_code: string;
+      product_name: string;
+      date: string;
+      type: 'purchase' | 'sale' | 'production_in' | 'production_out' | 'adjustment';
+      qty: number;
+    };
+
+    const transactions: Transaction[] = [];
+
+    // Add purchase items (increase stock)
+    purchaseItems.forEach((item) => {
+      if (item.purchase?.date && item.product_id) {
+        transactions.push({
+          product_id: item.product_id,
+          product_code: item.product?.code || item.product_code || '',
+          product_name: item.product?.name || item.product_name || 'Unknown',
+          date: item.purchase.date,
+          type: 'purchase',
+          qty: Number(item.qty) || 0,
+        });
+      }
+    });
+
+    // Add sale items (decrease stock)
+    saleItems.forEach((item) => {
+      if (item.sale?.date && item.product_id) {
+        transactions.push({
+          product_id: item.product_id,
+          product_code: item.product?.code || '',
+          product_name: item.product?.name || 'Unknown',
+          date: item.sale.date,
+          type: 'sale',
+          qty: Number(item.qty) || 0,
+        });
+      }
+    });
+
+    // Add adjustments (production or other adjustments)
+    adjustments.forEach((item) => {
+      if (item.adjustment_batch?.adjusted_at && item.product_id) {
+        const adjustDate = item.adjustment_batch.adjusted_at.split('T')[0];
+        const qty = Number(item.quantity) || 0;
+        
+        transactions.push({
+          product_id: item.product_id,
+          product_code: item.product?.code || '',
+          product_name: item.product?.name || 'Unknown',
+          date: adjustDate,
+          type: item.type === 'addition' ? 'production_in' : 'production_out',
+          qty: qty,
+        });
+      }
+    });
+
+    // Sort transactions by date
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Get unique months and products
+    const monthsSet = new Set<string>();
+    const productsMap = new Map<string, { code: string; name: string }>();
+
+    transactions.forEach((t) => {
+      const monthKey = t.date.substring(0, 7); // YYYY-MM
+      monthsSet.add(monthKey);
+      if (!productsMap.has(t.product_id)) {
+        productsMap.set(t.product_id, { code: t.product_code, name: t.product_name });
+      }
+    });
+
+    const months = Array.from(monthsSet).sort();
+    const productsList = Array.from(productsMap.entries());
+
+    // Calculate detailed monthly data for each product
+    type MonthlyData = {
+      beginning: number;
+      purchases: number;
+      sales: number;
+      production_in: number;
+      production_out: number;
+      ending: number;
+      variance: number;
+    };
+
+    type ProductMonthlyData = {
+      product_id: string;
+      product_code: string;
+      product_name: string;
+      monthly_data: Record<string, MonthlyData>;
+    };
+
+    const balances: ProductMonthlyData[] = productsList.map(([productId, productInfo]) => {
+      const monthlyData: Record<string, MonthlyData> = {};
+      let runningBalance = 0;
+
+      const productTransactions = transactions.filter((t) => t.product_id === productId);
+
+      months.forEach((month) => {
+        const beginning = runningBalance;
+        let purchases = 0;
+        let sales = 0;
+        let production_in = 0;
+        let production_out = 0;
+
+        // Sum up transactions for this month
+        productTransactions.forEach((t) => {
+          if (t.date.substring(0, 7) === month) {
+            if (t.type === 'purchase') purchases += t.qty;
+            else if (t.type === 'sale') sales += t.qty;
+            else if (t.type === 'production_in') production_in += t.qty;
+            else if (t.type === 'production_out') production_out += t.qty;
+          }
+        });
+
+        // Calculate ending balance
+        const calculated = beginning + purchases + production_in - sales - production_out;
+        runningBalance = calculated;
+
+        // Variance: difference between calculated and actual (for now, calculated is actual)
+        const variance = 0; // Can be enhanced later if you have physical count data
+
+        monthlyData[month] = {
+          beginning,
+          purchases,
+          sales,
+          production_in,
+          production_out,
+          ending: runningBalance,
+          variance,
+        };
+      });
+
+      return {
+        product_id: productId,
+        product_code: productInfo.code,
+        product_name: productInfo.name,
+        monthly_data: monthlyData,
+      };
+    });
+
+    // Filter by date range if specified
+    let filteredMonths = months;
+    if (dateRange.from && dateRange.to) {
+      const fromMonth = dateRange.from.substring(0, 7);
+      const toMonth = dateRange.to.substring(0, 7);
+      filteredMonths = months.filter((m) => m >= fromMonth && m <= toMonth);
+    }
+
+    return {
+      balances,
+      months: filteredMonths,
+    };
+  }, [purchaseItems, saleItems, adjustments, dateRange]);
+
+  // Section: Production/Marination Reconciliation Report
+  const productionReconciliation = useMemo(() => {
+    // Find chicken and marinated chicken products
+    const chickenProduct = monthlyInventoryBalance.balances.find(
+      (p) => p.product_name.toLowerCase().includes('chicken') && !p.product_name.toLowerCase().includes('marinated')
+    );
+    const marinatedProduct = monthlyInventoryBalance.balances.find(
+      (p) => p.product_name.toLowerCase().includes('marinated')
+    );
+
+    if (!chickenProduct || !marinatedProduct) {
+      return {
+        hasData: false,
+        months: [],
+        reconciliation: [],
+      };
+    }
+
+    type ReconciliationData = {
+      month: string;
+      chicken_used: number;
+      marinated_produced: number;
+      production_difference: number;
+      marinated_sold: number;
+      marinated_ending: number;
+      status: 'match' | 'mismatch' | 'no_production' | 'oversold';
+      alert_message: string;
+    };
+
+    const reconciliation: ReconciliationData[] = monthlyInventoryBalance.months.map((month) => {
+      const chickenData = chickenProduct.monthly_data[month] || {
+        beginning: 0, purchases: 0, sales: 0, production_in: 0, production_out: 0, ending: 0, variance: 0
+      };
+      const marinatedData = marinatedProduct.monthly_data[month] || {
+        beginning: 0, purchases: 0, sales: 0, production_in: 0, production_out: 0, ending: 0, variance: 0
+      };
+
+      const chicken_used = chickenData.production_out;
+      const marinated_produced = marinatedData.production_in;
+      const production_difference = marinated_produced - chicken_used;
+      const marinated_sold = marinatedData.sales;
+      const marinated_ending = marinatedData.ending;
+
+      // Determine production status (this month only)
+      let status: 'match' | 'mismatch' | 'no_production' | 'oversold' = 'match';
+      let alert_message = '';
+
+      // First check production matching for this month
+      if (marinated_sold > 0 && marinated_produced === 0 && chicken_used === 0) {
+        status = 'no_production';
+        alert_message = `Sold ${marinated_sold} units but no production recorded!`;
+      } else if (chicken_used > 0 || marinated_produced > 0) {
+        if (production_difference !== 0) {
+          status = 'mismatch';
+          alert_message = `Production mismatch: ${production_difference > 0 ? '+' : ''}${production_difference} units`;
+        } else {
+          status = 'match';
+          alert_message = ''; // No message for matched production
+        }
+      }
+
+      // Add oversold warning to message if ending is negative (but keep production status)
+      if (marinated_ending < 0) {
+        if (status === 'match' && chicken_used > 0) {
+          alert_message = `⚠ Stock Alert: Ending balance is negative (${marinated_ending})`;
+        } else if (status === 'no_production') {
+          status = 'oversold';
+          alert_message = `Oversold! No production but sold ${marinated_sold}. Ending: ${marinated_ending}`;
+        }
+      }
+
+      return {
+        month,
+        chicken_used,
+        marinated_produced,
+        production_difference,
+        marinated_sold,
+        marinated_ending,
+        status,
+        alert_message,
+      };
+    });
+
+    return {
+      hasData: true,
+      months: monthlyInventoryBalance.months,
+      reconciliation,
+      chickenProduct,
+      marinatedProduct,
+    };
+  }, [monthlyInventoryBalance]);
 
   // Export CSV for each section
   const handleExportCSV = (rows: any[], filename: string) => {
@@ -647,6 +902,200 @@ const Reports = () => {
           </div>
           <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productPurchaseReport, 'product_purchase_report.csv')}>
             <FaFileCsv /> Export Product Purchase Report
+          </button>
+        </section>
+
+        {/* Production/Marination Reconciliation Report Section */}
+        {productionReconciliation.hasData && (
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">🐔 Production/Marination Reconciliation Report</h2>
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl shadow p-4 mb-6">
+              <p className="text-sm text-gray-700">
+                <strong>Tracking:</strong> {productionReconciliation.chickenProduct?.product_name} → {productionReconciliation.marinatedProduct?.product_name}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                This report compares raw chicken used for marination vs marinated chicken produced to identify discrepancies.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow overflow-x-auto mb-6">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-100">
+                    <th className="p-3 text-left font-semibold">Month</th>
+                    <th className="p-3 text-right font-semibold text-orange-700">Raw Chicken Used</th>
+                    <th className="p-3 text-right font-semibold text-blue-700">Marinated Produced</th>
+                    <th className="p-3 text-right font-semibold">Difference</th>
+                    <th className="p-3 text-right font-semibold text-red-700">Marinated Sold</th>
+                    <th className="p-3 text-right font-semibold">Stock Left</th>
+                    <th className="p-3 text-left font-semibold">Alert Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productionReconciliation.reconciliation.map((row) => {
+                    const statusColors = {
+                      match: 'bg-green-50',
+                      mismatch: 'bg-yellow-50',
+                      no_production: 'bg-red-50',
+                      oversold: 'bg-red-100',
+                    };
+
+                    return (
+                      <tr key={row.month} className={`border-b hover:bg-gray-50 ${statusColors[row.status]}`}>
+                        <td className="p-3 font-medium">
+                          {new Date(row.month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                        </td>
+                        <td className="p-3 text-right text-orange-700 font-semibold">
+                          {row.chicken_used > 0 ? row.chicken_used : '-'}
+                        </td>
+                        <td className="p-3 text-right text-blue-700 font-semibold">
+                          {row.marinated_produced > 0 ? `+${row.marinated_produced}` : '-'}
+                        </td>
+                        <td className={`p-3 text-right font-bold ${row.production_difference !== 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                          {row.production_difference !== 0 ? (row.production_difference > 0 ? `+${row.production_difference}` : row.production_difference) : '0'}
+                        </td>
+                        <td className="p-3 text-right text-red-700 font-semibold">
+                          {row.marinated_sold > 0 ? row.marinated_sold : '-'}
+                        </td>
+                        <td className={`p-3 text-right font-bold ${row.marinated_ending < 0 ? 'text-red-600' : row.marinated_ending === 0 ? 'text-gray-400' : 'text-green-700'}`}>
+                          {row.marinated_ending}
+                        </td>
+                        <td className="p-3 text-sm">
+                          <span className={row.alert_message ? 'text-red-700' : 'text-gray-400'}>
+                            {row.alert_message || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" 
+                onClick={() => {
+                  const exportData = productionReconciliation.reconciliation.map((row) => ({
+                    month: new Date(row.month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
+                    raw_chicken_used: row.chicken_used,
+                    marinated_produced: row.marinated_produced,
+                    difference: row.production_difference,
+                    marinated_sold: row.marinated_sold,
+                    stock_left: row.marinated_ending,
+                    status: row.status,
+                    alert_message: row.alert_message,
+                  }));
+                  handleExportCSV(exportData, 'production_reconciliation.csv');
+                }}
+              >
+                <FaFileCsv /> Export Production Reconciliation
+              </button>
+            </div>
+          </section>
+        )}
+
+        {/* Monthly Inventory Balance Report Section */}
+        <section>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaWarehouse /> Monthly Inventory Balance Report with Variance Analysis</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <ReportSummaryCard label="Products Tracked" value={monthlyInventoryBalance.balances.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
+            <ReportSummaryCard label="Months Covered" value={monthlyInventoryBalance.months.length.toString()} icon={<FaCalendarAlt className="text-green-500" />} />
+          </div>
+          
+          {/* Detailed breakdown per product */}
+          {monthlyInventoryBalance.balances.length === 0 ? (
+            <div className="bg-white rounded-xl shadow p-6 text-center text-gray-400">No inventory data found</div>
+          ) : monthlyInventoryBalance.balances.map((product) => (
+            <div key={product.product_id} className="bg-white rounded-xl shadow mb-6">
+              <div className="p-4 bg-gray-50 border-b">
+                <h3 className="text-lg font-bold">{product.product_code} - {product.product_name}</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-gray-100">
+                      <th className="p-3 text-left font-semibold">Month</th>
+                      <th className="p-3 text-right font-semibold">Beginning</th>
+                      <th className="p-3 text-right font-semibold text-green-700">Purchases</th>
+                      <th className="p-3 text-right font-semibold text-blue-700">Production In</th>
+                      <th className="p-3 text-right font-semibold text-red-700">Sales</th>
+                      <th className="p-3 text-right font-semibold text-orange-700">Production Out</th>
+                      <th className="p-3 text-right font-semibold">Ending</th>
+                      <th className="p-3 text-right font-semibold">Variance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monthlyInventoryBalance.months.map((month) => {
+                      const data = product.monthly_data[month];
+                      if (!data) return null;
+                      
+                      const hasDiscrepancy = data.ending < 0;
+                      
+                      return (
+                        <tr key={month} className={`border-b hover:bg-gray-50 ${hasDiscrepancy ? 'bg-red-50' : ''}`}>
+                          <td className="p-3 font-medium">
+                            {new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                            {hasDiscrepancy && <span className="ml-2 text-xs bg-red-600 text-white px-2 py-0.5 rounded">⚠ Alert</span>}
+                          </td>
+                          <td className="p-3 text-right">{data.beginning}</td>
+                          <td className="p-3 text-right text-green-700 font-semibold">
+                            {data.purchases > 0 ? `+${data.purchases}` : data.purchases}
+                          </td>
+                          <td className="p-3 text-right text-blue-700 font-semibold">
+                            {data.production_in > 0 ? `+${data.production_in}` : data.production_in}
+                          </td>
+                          <td className="p-3 text-right text-red-700 font-semibold">
+                            {data.sales > 0 ? `-${data.sales}` : data.sales}
+                          </td>
+                          <td className="p-3 text-right text-orange-700 font-semibold">
+                            {data.production_out > 0 ? `-${data.production_out}` : data.production_out}
+                          </td>
+                          <td className={`p-3 text-right font-bold ${data.ending < 0 ? 'text-red-600' : data.ending === 0 ? 'text-gray-400' : 'text-green-700'}`}>
+                            {data.ending}
+                          </td>
+                          <td className="p-3 text-right">
+                            {data.variance !== 0 && (
+                              <span className="text-red-600 font-semibold">{data.variance}</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          <button 
+            className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" 
+            onClick={() => {
+              // Prepare detailed data for CSV export
+              const exportData: any[] = [];
+              monthlyInventoryBalance.balances.forEach((product) => {
+                monthlyInventoryBalance.months.forEach((month) => {
+                  const data = product.monthly_data[month];
+                  if (data) {
+                    exportData.push({
+                      product_code: product.product_code,
+                      product_name: product.product_name,
+                      month: new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
+                      beginning: data.beginning,
+                      purchases: data.purchases,
+                      production_in: data.production_in,
+                      sales: data.sales,
+                      production_out: data.production_out,
+                      ending: data.ending,
+                      variance: data.variance,
+                    });
+                  }
+                });
+              });
+              handleExportCSV(exportData, 'monthly_inventory_variance_analysis.csv');
+            }}
+          >
+            <FaFileCsv /> Export Variance Analysis
           </button>
         </section>
 
