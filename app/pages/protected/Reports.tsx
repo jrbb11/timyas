@@ -30,6 +30,8 @@ const Reports = () => {
   const [brands, setBrands] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [saleItems, setSaleItems] = useState<any[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<any[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -43,6 +45,8 @@ const Reports = () => {
       brandsService.getAll(),
       unitsService.getAll(),
       customersService.getAll(),
+      supabase.from('sale_items').select('*, product:products(id, name, code), sale:sales(id, date)'),
+      supabase.from('purchase_items').select('*, product:products(id, name, code), purchase:purchases(id, date)'),
     ])
       .then(([
         salesRes,
@@ -53,6 +57,8 @@ const Reports = () => {
         brandsRes,
         unitsRes,
         customersRes,
+        saleItemsRes,
+        purchaseItemsRes,
       ]) => {
         if (salesRes.error) throw salesRes.error;
         if (purchasesRes.error) throw purchasesRes.error;
@@ -62,6 +68,8 @@ const Reports = () => {
         if (brandsRes.error) throw brandsRes.error;
         if (unitsRes.error) throw unitsRes.error;
         if (customersRes.error) throw customersRes.error;
+        if (saleItemsRes.error) throw saleItemsRes.error;
+        if (purchaseItemsRes.error) throw purchaseItemsRes.error;
         setSales(salesRes.data || []);
         setPurchases(purchasesRes.data || []);
         setExpenses(expensesRes.data || []);
@@ -70,6 +78,8 @@ const Reports = () => {
         setBrands(brandsRes.data || []);
         setUnits(unitsRes.data || []);
         setCustomers(customersRes.data || []);
+        setSaleItems(saleItemsRes.data || []);
+        setPurchaseItems(purchaseItemsRes.data || []);
       })
       .catch((err) => setError(err.message || 'Failed to load data'))
       .finally(() => setLoading(false));
@@ -186,6 +196,98 @@ const Reports = () => {
   const recentCustomers = useMemo(() => {
     return [...customers].sort((a, b) => new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime()).slice(0, 10);
   }, [customers]);
+
+  // Section: Product Sales Report (by items)
+  const productSalesReport = useMemo(() => {
+    // Filter sale items by date range
+    const filteredItems = saleItems.filter((item) => {
+      if (!dateRange.from || !dateRange.to || !item.sale?.date) return true;
+      const from = new Date(dateRange.from);
+      const to = new Date(dateRange.to);
+      to.setHours(23, 59, 59, 999);
+      const d = new Date(item.sale.date);
+      return d >= from && d <= to;
+    });
+
+    // Group by product and aggregate
+    const groupedMap = new Map<string, { product_id: string; product_code: string; product_name: string; total_qty: number; total_amount: number }>();
+    
+    filteredItems.forEach((item) => {
+      const productId = item.product_id;
+      const productName = item.product?.name || 'Unknown Product';
+      const productCode = item.product?.code || '';
+      const qty = Number(item.qty) || 0;
+      const price = Number(item.price) || 0;
+      const discount = Number(item.discount) || 0;
+      const tax = Number(item.tax) || 0;
+      const amount = (price * qty) - discount + tax;
+
+      if (groupedMap.has(productId)) {
+        const existing = groupedMap.get(productId)!;
+        existing.total_qty += qty;
+        existing.total_amount += amount;
+      } else {
+        groupedMap.set(productId, {
+          product_id: productId,
+          product_code: productCode,
+          product_name: productName,
+          total_qty: qty,
+          total_amount: amount,
+        });
+      }
+    });
+
+    return Array.from(groupedMap.values()).sort((a, b) => b.total_amount - a.total_amount);
+  }, [saleItems, dateRange]);
+
+  const totalProductSales = productSalesReport.reduce((sum, item) => sum + item.total_amount, 0);
+  const totalProductSalesQty = productSalesReport.reduce((sum, item) => sum + item.total_qty, 0);
+
+  // Section: Product Purchase Report (by items)
+  const productPurchaseReport = useMemo(() => {
+    // Filter purchase items by date range
+    const filteredItems = purchaseItems.filter((item) => {
+      if (!dateRange.from || !dateRange.to || !item.purchase?.date) return true;
+      const from = new Date(dateRange.from);
+      const to = new Date(dateRange.to);
+      to.setHours(23, 59, 59, 999);
+      const d = new Date(item.purchase.date);
+      return d >= from && d <= to;
+    });
+
+    // Group by product and aggregate
+    const groupedMap = new Map<string, { product_id: string; product_code: string; product_name: string; total_qty: number; total_amount: number }>();
+    
+    filteredItems.forEach((item) => {
+      const productId = item.product_id;
+      const productName = item.product?.name || item.product_name || 'Unknown Product';
+      const productCode = item.product?.code || item.product_code || '';
+      const qty = Number(item.qty) || 0;
+      const cost = Number(item.cost) || 0;
+      const discount = Number(item.discount) || 0;
+      const tax = Number(item.tax) || 0;
+      const amount = (cost * qty) - discount + tax;
+
+      if (groupedMap.has(productId)) {
+        const existing = groupedMap.get(productId)!;
+        existing.total_qty += qty;
+        existing.total_amount += amount;
+      } else {
+        groupedMap.set(productId, {
+          product_id: productId,
+          product_code: productCode,
+          product_name: productName,
+          total_qty: qty,
+          total_amount: amount,
+        });
+      }
+    });
+
+    return Array.from(groupedMap.values()).sort((a, b) => b.total_amount - a.total_amount);
+  }, [purchaseItems, dateRange]);
+
+  const totalProductPurchases = productPurchaseReport.reduce((sum, item) => sum + item.total_amount, 0);
+  const totalProductPurchasesQty = productPurchaseReport.reduce((sum, item) => sum + item.total_qty, 0);
 
   // Export CSV for each section
   const handleExportCSV = (rows: any[], filename: string) => {
@@ -436,6 +538,115 @@ const Reports = () => {
           </div>
           <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(recentCustomers, 'recent_customers.csv')}>
             <FaFileCsv /> Export Customers
+          </button>
+        </section>
+
+        {/* Product Sales Report Section */}
+        <PermissionGuard
+          resource="financial"
+          action="read"
+          fallback={
+            <section>
+              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaBoxes /> Product Sales Report</h2>
+              <div className="bg-white rounded-xl shadow p-6 min-h-[250px] flex flex-col items-center justify-center mb-4">
+                <div className="text-center text-gray-400">
+                  <div className="text-4xl mb-4">🔒</div>
+                  <div className="text-lg font-semibold mb-2">Financial Data Access Restricted</div>
+                  <div>You don't have permission to view product sales data</div>
+                </div>
+              </div>
+            </section>
+          }
+        >
+          <section>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaBoxes /> Product Sales Report (By Items)</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <ReportSummaryCard label="Total Products Sold" value={productSalesReport.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
+              <ReportSummaryCard label="Total Quantity Sold" value={totalProductSalesQty.toString()} icon={<FaBoxes className="text-green-500" />} />
+              <ReportSummaryCard label="Total Sales Amount" value={formatCurrency(totalProductSales)} icon={<FaChartBar className="text-purple-500" />} />
+            </div>
+            <div className="bg-white rounded-xl shadow p-0 overflow-x-auto mb-4">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="p-4 text-left font-semibold">Product Code</th>
+                    <th className="p-4 text-left font-semibold">Product Name</th>
+                    <th className="p-4 text-right font-semibold">Total Qty Sold</th>
+                    <th className="p-4 text-right font-semibold">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productSalesReport.length === 0 ? (
+                    <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No product sales found</td></tr>
+                  ) : productSalesReport.map((item) => (
+                    <tr key={item.product_id} className="border-b hover:bg-gray-50">
+                      <td className="p-4">{item.product_code}</td>
+                      <td className="p-4">{item.product_name}</td>
+                      <td className="p-4 text-right">{item.total_qty}</td>
+                      <td className="p-4 text-right font-semibold">{formatCurrency(item.total_amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {productSalesReport.length > 0 && (
+                  <tfoot className="bg-gray-50 font-bold">
+                    <tr className="border-t-2">
+                      <td className="p-4" colSpan={2}>TOTAL</td>
+                      <td className="p-4 text-right">{totalProductSalesQty}</td>
+                      <td className="p-4 text-right">{formatCurrency(totalProductSales)}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+            <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productSalesReport, 'product_sales_report.csv')}>
+              <FaFileCsv /> Export Product Sales Report
+            </button>
+          </section>
+        </PermissionGuard>
+
+        {/* Product Purchase Report Section */}
+        <section>
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaBoxes /> Product Purchase Report (By Items)</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <ReportSummaryCard label="Total Products Purchased" value={productPurchaseReport.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
+            <ReportSummaryCard label="Total Quantity Purchased" value={totalProductPurchasesQty.toString()} icon={<FaBoxes className="text-green-500" />} />
+            <ReportSummaryCard label="Total Purchase Amount" value={formatCurrency(totalProductPurchases)} icon={<FaChartBar className="text-orange-500" />} />
+          </div>
+          <div className="bg-white rounded-xl shadow p-0 overflow-x-auto mb-4">
+            <table className="min-w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-4 text-left font-semibold">Product Code</th>
+                  <th className="p-4 text-left font-semibold">Product Name</th>
+                  <th className="p-4 text-right font-semibold">Total Qty Purchased</th>
+                  <th className="p-4 text-right font-semibold">Total Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productPurchaseReport.length === 0 ? (
+                  <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No product purchases found</td></tr>
+                ) : productPurchaseReport.map((item) => (
+                  <tr key={item.product_id} className="border-b hover:bg-gray-50">
+                    <td className="p-4">{item.product_code}</td>
+                    <td className="p-4">{item.product_name}</td>
+                    <td className="p-4 text-right">{item.total_qty}</td>
+                    <td className="p-4 text-right font-semibold">{formatCurrency(item.total_amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {productPurchaseReport.length > 0 && (
+                <tfoot className="bg-gray-50 font-bold">
+                  <tr className="border-t-2">
+                    <td className="p-4" colSpan={2}>TOTAL</td>
+                    <td className="p-4 text-right">{totalProductPurchasesQty}</td>
+                    <td className="p-4 text-right">{formatCurrency(totalProductPurchases)}</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+          <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productPurchaseReport, 'product_purchase_report.csv')}>
+            <FaFileCsv /> Export Product Purchase Report
           </button>
         </section>
 
