@@ -773,6 +773,9 @@ CREATE TABLE public.product_adjustments (
     quantity NUMERIC NOT NULL,
     before_stock NUMERIC NOT NULL,
     after_stock NUMERIC NOT NULL,
+    -- Optional cost tracking for valuation
+    unit_cost NUMERIC(10, 2) NULL,
+    total_cost NUMERIC(12, 2) NULL,
     adjusted_by UUID NULL,
     adjusted_at TIMESTAMP WITH TIME ZONE NULL DEFAULT timezone('Asia/Manila'::TEXT, NOW()),
     CONSTRAINT product_adjustments_pkey PRIMARY KEY (id),
