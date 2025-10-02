@@ -40,9 +40,6 @@ const CreateStockAdjustment = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add state for marination cost
-  const [marinationCost, setMarinationCost] = useState(15);
-
   // Add state for marination quantity
   const [marinationQty, setMarinationQty] = useState(1);
 
@@ -88,7 +85,7 @@ const CreateStockAdjustment = () => {
         setReason(batch.reason || '');
       }
       // Map adjustment items to adjustmentItems format
-      setAdjustmentItems((itemsRes.data || []).map((item: any) => ({
+      const mapped = (itemsRes.data || []).map((item: any) => ({
         ...products.find((p: any) => p.id === item.product_id),
         id: item.product_id,
         type: item.type,
@@ -97,21 +94,43 @@ const CreateStockAdjustment = () => {
         after_stock: item.after_stock,
         unit_cost: item.unit_cost || 0,
         total_cost: item.total_cost || 0,
-      })));
+      }));
+      // For Production/Marination edits, show only the raw chicken subtraction row for editing
+      const batchReason = batchRes?.data?.reason || '';
+      if ((batchReason || '').toLowerCase() === 'production/marination'.toLowerCase()) {
+        const subItem = mapped.find(m => m.type === 'subtraction') || mapped[0];
+        if (subItem) {
+          setMarinationQty(Number(subItem.quantity) || 1);
+          setAdjustmentItems([{ ...subItem, unit_cost: 0, total_cost: 0 }]);
+        } else {
+          setAdjustmentItems([]);
+        }
+      } else {
+        setAdjustmentItems(mapped);
+      }
       setLoading(false);
     });
   }, [isEdit, id, products]);
 
-  // Filter products by search
-  const filteredProducts = productSearch
-    ? products.filter(
-        (p: any) =>
-          p.name?.toLowerCase().includes(productSearch.toLowerCase()) ||
-          p.code?.toLowerCase().includes(productSearch.toLowerCase())
-      )
-    : [];
+  // Filter products by search (restrict to Chicken for Production/Marination)
+  const filteredProducts = (() => {
+    const term = (productSearch || '').toLowerCase();
+    let list = productSearch
+      ? products.filter((p: any) =>
+          p.name?.toLowerCase().includes(term) || p.code?.toLowerCase().includes(term)
+        )
+      : [];
+    if (reason === 'Production/Marination') {
+      list = list.filter((p: any) => (p.name || '').toLowerCase().includes('chicken'));
+    }
+    return list;
+  })();
 
   const handleSelectProduct = (product: any) => {
+    if (reason === 'Production/Marination' && !(product.name?.toLowerCase().includes('chicken'))) {
+      alert('Only Chicken is allowed for Production/Marination.');
+      return;
+    }
     if (reason === 'Production/Marination' && product.name?.toLowerCase() === 'chicken') {
       if (adjustmentItems.some(item => item.name?.toLowerCase() === 'chicken' && item.type === 'subtraction')) return;
       const currentStock = currentStocks[product.id] || 0;
@@ -121,8 +140,8 @@ const CreateStockAdjustment = () => {
         quantity: marinationQty,
         before_stock: currentStock,
         after_stock: currentStock - marinationQty,
-        unit_cost: product.product_cost || 0,
-        total_cost: (product.product_cost || 0) * marinationQty,
+        unit_cost: 0,
+        total_cost: 0,
       };
       setAdjustmentItems([subItem]);
       setProductSearch('');
@@ -150,23 +169,18 @@ const CreateStockAdjustment = () => {
     searchInputRef.current?.focus();
   };
 
-  // Sync marinationQty to both items
+  // Sync marinationQty for marination flow
   useEffect(() => {
-    if (reason === 'Production/Marination' && adjustmentItems.length === 2) {
-      const [subItem, addItem] = adjustmentItems;
-      const newSub = { 
-        ...subItem, 
-        quantity: marinationQty, 
-        after_stock: subItem.before_stock - marinationQty,
-        total_cost: (subItem.unit_cost || 0) * marinationQty,
+    if (reason === 'Production/Marination' && adjustmentItems.length >= 1) {
+      const updated = [...adjustmentItems];
+      // Update first (subtraction) item
+      updated[0] = {
+        ...updated[0],
+        quantity: marinationQty,
+        after_stock: updated[0].before_stock - marinationQty,
+        total_cost: 0,
       };
-      const newAdd = { 
-        ...addItem, 
-        quantity: marinationQty, 
-        after_stock: addItem.before_stock + marinationQty,
-        total_cost: (addItem.unit_cost || 0) * marinationQty,
-      };
-      setAdjustmentItems([newSub, newAdd]);
+      setAdjustmentItems(updated);
     }
     // eslint-disable-next-line
   }, [marinationQty]);
@@ -186,7 +200,7 @@ const CreateStockAdjustment = () => {
     const updatedItems = [...adjustmentItems];
     const item = updatedItems[editItemIdx];
     const quantity = Number(editForm.quantity);
-    const unitCost = Number(editForm.unit_cost) || 0;
+    const unitCost = reason === 'Production/Marination' ? 0 : (Number(editForm.unit_cost) || 0);
     const newAfterStock = item.type === 'addition' 
       ? item.before_stock + quantity
       : item.before_stock - quantity;
@@ -225,12 +239,32 @@ const CreateStockAdjustment = () => {
         const { data: auth } = await supabase.auth.getUser();
         const userId = auth?.user?.id;
         if (userId) {
-          const { data: person } = await supabase
+          // Try to resolve a linked person row
+          let { data: person } = await supabase
             .from('people')
             .select('id')
             .eq('user_id', userId)
             .limit(1)
             .single();
+          if (!person) {
+            // Create a minimal people row linked to this user
+            const { data: appUser } = await supabase
+              .from('app_users')
+              .select('first_name, last_name, email')
+              .eq('user_id', userId)
+              .limit(1)
+              .single();
+            const fullName = [appUser?.first_name, appUser?.last_name]
+              .filter(Boolean)
+              .join(' ');
+            const name = fullName || appUser?.email || 'User';
+            const { data: created } = await supabase
+              .from('people')
+              .insert([{ user_id: userId, name, type: 'user' }])
+              .select('id')
+              .single();
+            person = created || null;
+          }
           adjustedByPersonId = person?.id || null;
         }
       } catch (_) {
@@ -266,6 +300,15 @@ const CreateStockAdjustment = () => {
       }
       // For marination, add marinated chicken addition automatically
       if (reason === 'Production/Marination') {
+        // If editing, clear existing items for this batch to avoid duplicates
+        if (isEdit && batchId) {
+          const { error: delErr } = await productAdjustmentsService.removeByBatchId(batchId as string);
+          if (delErr) {
+            setError('Failed to clear existing adjustment items: ' + delErr.message);
+            setLoading(false);
+            return;
+          }
+        }
         const subItem = adjustmentItems[0];
         // Find marinated chicken product
         const marinatedChicken = products.find(p => p.name?.toLowerCase().includes('marinated'));
@@ -274,9 +317,6 @@ const CreateStockAdjustment = () => {
           setLoading(false);
           return;
         }
-        // Get raw chicken cost
-        const rawCost = subItem.product_cost || 0;
-        const newCost = rawCost + marinationCost;
         // Create both adjustments
         const items = [
           {
@@ -287,8 +327,7 @@ const CreateStockAdjustment = () => {
             before_stock: subItem.before_stock,
             after_stock: subItem.after_stock,
             adjusted_by: adjustedByPersonId,
-            unit_cost: subItem.unit_cost || 0,
-            total_cost: subItem.total_cost || 0,
+            // No pricing for Production/Marination
           },
           {
             adjustment_batch_id: batchId,
@@ -298,8 +337,7 @@ const CreateStockAdjustment = () => {
             before_stock: currentStocks[marinatedChicken.id] || 0,
             after_stock: (currentStocks[marinatedChicken.id] || 0) + subItem.quantity,
             adjusted_by: adjustedByPersonId,
-            unit_cost: marinatedChicken.product_cost || 0,
-            total_cost: (marinatedChicken.product_cost || 0) * subItem.quantity,
+            // No pricing for Production/Marination
           },
         ];
         // Debug log
@@ -311,11 +349,19 @@ const CreateStockAdjustment = () => {
           return;
         }
         console.log('Inserted product_adjustments:', adjData);
-        // Update marinated chicken cost
-        await productsService.update(marinatedChicken.id, { product_cost: newCost });
         setSuccess('Stock adjustment created successfully!');
+        navigate('/products/stock-adjustments');
       } else {
         // Default: create adjustments as usual
+        // If editing, clear existing items for this batch to avoid duplicates
+        if (isEdit && batchId) {
+          const { error: delErr } = await productAdjustmentsService.removeByBatchId(batchId as string);
+          if (delErr) {
+            setError('Failed to clear existing adjustment items: ' + delErr.message);
+            setLoading(false);
+            return;
+          }
+        }
         const items = adjustmentItems.map(item => ({
           adjustment_batch_id: batchId,
           product_id: item.id,
@@ -329,6 +375,7 @@ const CreateStockAdjustment = () => {
         }));
         await productAdjustmentsService.createMany(items);
         setSuccess('Stock adjustment created successfully!');
+        navigate('/products/stock-adjustments');
       }
     } catch (err: any) {
       setError(err.message);
@@ -457,7 +504,7 @@ const CreateStockAdjustment = () => {
             )}
           </div>
 
-          {reason === 'Production/Marination' && adjustmentItems.length === 2 && (
+          {reason === 'Production/Marination' && adjustmentItems.length >= 1 && (
             <div className="mb-4">
               <label className="block text-sm font-medium mb-1">Number of Chickens to Marinate</label>
               <input
@@ -545,19 +592,6 @@ const CreateStockAdjustment = () => {
                               <FaTrash size={14} />
                             </button>
                           </div>
-                          {/* Marination cost field for marinated chicken addition */}
-                          {reason === 'Production/Marination' && item.type === 'addition' && item.name?.toLowerCase().includes('marinated') && (
-                            <div className="mt-2">
-                              <label className="block text-xs font-medium mb-1">Additional Cost per Chicken (₱)</label>
-                              <input
-                                type="number"
-                                min="0"
-                                className="w-24 border rounded px-2 py-1"
-                                value={marinationCost}
-                                onChange={e => setMarinationCost(Number(e.target.value))}
-                              />
-                            </div>
-                          )}
                         </td>
                       </tr>
                     ))
@@ -655,7 +689,9 @@ const CreateStockAdjustment = () => {
                 min="0"
                 step="0.01"
                 className="w-full border rounded px-3 py-2"
-                value={editForm.unit_cost || 0}
+                value={reason === 'Production/Marination' ? 0 : (editForm.unit_cost || 0)}
+                disabled={reason === 'Production/Marination'}
+                readOnly={reason === 'Production/Marination'}
                 onChange={e => {
                   const unitCost = Number(e.target.value);
                   const quantity = Number(editForm.quantity) || 0;

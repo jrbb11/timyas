@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { adjustmentBatchesService } from '../../services/adjustmentBatchesService';
 import { productAdjustmentsService } from '../../services/productAdjustmentsService';
+import Modal from '../../components/ui/Modal';
 
 const StockAdjustmentView = () => {
   const { id } = useParams();
@@ -11,6 +12,7 @@ const StockAdjustmentView = () => {
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -74,7 +76,13 @@ const StockAdjustmentView = () => {
           </h1>
           <div className="flex gap-2">
             <button
-              onClick={() => navigate(`/products/stock-adjustments/edit/${adjustment.id}`)}
+              onClick={() => {
+                if ((adjustment.reason || '').toLowerCase() === 'production/marination'.toLowerCase()) {
+                  setShowApprovalModal(true);
+                } else {
+                  navigate(`/products/stock-adjustments/edit/${adjustment.id}`);
+                }
+              }}
               className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
             >
               Edit
@@ -88,6 +96,32 @@ const StockAdjustmentView = () => {
           </div>
         </div>
 
+      {/* Approval Gate Modal for Production/Marination Edits */}
+      <Modal
+        isOpen={showApprovalModal}
+        onClose={() => setShowApprovalModal(false)}
+        title="Approval Required"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">
+            Editing adjustments with reason <span className="font-semibold">Production/Marination</span> requires prior approval. Please confirm you have approval before proceeding.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate(`/products/stock-adjustments/edit/${adjustment.id}`)}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            >
+              I have approval – Proceed to Edit
+            </button>
+            <button
+              onClick={() => setShowApprovalModal(false)}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
         {/* Adjustment Details */}
         <div className="bg-white rounded-lg shadow mb-6">
           <div className="p-6 border-b">

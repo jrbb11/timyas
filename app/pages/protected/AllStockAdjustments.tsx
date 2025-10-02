@@ -18,6 +18,8 @@ const AllStockAdjustments = () => {
   const [loadingAction, setLoadingAction] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [selected, setSelected] = useState<any[]>([]);
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<any | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -58,7 +60,20 @@ const AllStockAdjustments = () => {
     setToast({ message: 'Selected export not implemented yet', type: 'error' });
   };
   const handleEdit = (adjustment: any) => {
+    if ((adjustment.reason || '').toLowerCase() === 'production/marination'.toLowerCase()) {
+      setPendingEdit(adjustment);
+      setShowApprovalModal(true);
+      return;
+    }
     navigate(`/products/stock-adjustments/edit/${adjustment.id}`);
+  };
+
+  const proceedWithApprovedEdit = () => {
+    if (pendingEdit) {
+      navigate(`/products/stock-adjustments/edit/${pendingEdit.id}`);
+      setShowApprovalModal(false);
+      setPendingEdit(null);
+    }
   };
   const handleView = (adjustment: any) => {
     navigate(`/products/stock-adjustments/view/${adjustment.id}`);
@@ -229,6 +244,36 @@ const AllStockAdjustments = () => {
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Approval Gate Modal for Production/Marination Edits */}
+        <Modal
+          isOpen={showApprovalModal}
+          onClose={() => setShowApprovalModal(false)}
+          title="Approval Required"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Editing adjustments with reason <span className="font-semibold">Production/Marination</span> requires prior approval. Please confirm you have approval before proceeding.
+            </p>
+            <p className="text-xs text-gray-500">
+              Reference: <span className="font-mono">{pendingEdit?.reference_code}</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={proceedWithApprovedEdit}
+                className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+              >
+                I have approval – Proceed to Edit
+              </button>
+              <button
+                onClick={() => setShowApprovalModal(false)}
                 className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
               >
                 Cancel
