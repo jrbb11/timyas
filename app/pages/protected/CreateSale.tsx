@@ -137,9 +137,11 @@ const CreateSale = () => {
         console.log('First audit log structure:', data?.[0]); // Debug the structure
         setAuditLogs(data || []);
         // Fetch user names for all user_ids in logs
-        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id).filter(Boolean)));
+        const userIds: string[] = Array.from(
+          new Set(((data || []).map((log: any) => log.user_id as string).filter(Boolean)))
+        ) as string[];
         if (userIds.length) {
-          const users = await customersService.getUsersByIds(userIds);
+          const users = await customersService.getUsersByIds(userIds as string[]);
           const map: Record<string, string> = {};
           users.forEach((u: any) => { map[u.user_id] = u.name || u.email || u.user_id; });
           setUserMap(map);
@@ -266,7 +268,6 @@ const CreateSale = () => {
           setLoading(false);
           return;
         }
-        console.log('Current user for update:', user.id, user.email); // Debug log
         // Fetch old sale data for diff
         const { data: oldSale, error: oldError } = await salesService.getById(id as string);
         if (oldError) {
@@ -274,7 +275,14 @@ const CreateSale = () => {
           setLoading(false);
           return;
         }
-        // Prepare update data
+        // Delete old items FIRST so stock returns to the OLD warehouse
+        const { data: oldItems } = await saleItemsService.getBySaleId(id as string);
+        if (oldItems && oldItems.length > 0) {
+          for (const item of oldItems) {
+            await saleItemsService.remove(item.id);
+          }
+        }
+        // Then update sale header (may change warehouse)
         const saleData = {
           invoice_number: invoiceNumber,
           date,
@@ -291,6 +299,21 @@ const CreateSale = () => {
         const { error: updateError } = await salesService.update(id as string, saleData, user.id, oldSale);
         if (updateError) {
           setError(updateError.message || 'Failed to update sale');
+          setLoading(false);
+          return;
+        }
+        // Finally insert new items so stock is deducted from the (possibly new) warehouse
+        const items = orderItems.map(item => ({
+          sale_id: id,
+          product_id: item.id,
+          price: item.product_price,
+          qty: item.qty,
+          discount: item.discount,
+          tax: item.tax,
+        }));
+        const { error: itemsError } = await saleItemsService.create(items);
+        if (itemsError) {
+          setError(itemsError.message || 'Failed to update sale items');
           setLoading(false);
           return;
         }
@@ -415,7 +438,7 @@ const CreateSale = () => {
                           <ul className="list-disc ml-4">
                             {log.old_values && log.new_values ? (
                               (() => {
-                                const changes = [];
+                                const changes: React.ReactNode[] = [];
                                 const oldKeys = Object.keys(log.old_values || {});
                                 const newKeys = Object.keys(log.new_values || {});
                                 const allKeys = [...new Set([...oldKeys, ...newKeys])];

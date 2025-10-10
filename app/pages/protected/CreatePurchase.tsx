@@ -215,7 +215,14 @@ const CreatePurchase = () => {
     setSuccess(null);
     try {
       if (isEdit) {
-        // Update purchase
+        // Delete old items FIRST to ensure stock is decremented from the OLD warehouse
+        const { data: oldItems } = await purchaseItemsService.getByPurchaseId(id as string);
+        if (oldItems && oldItems.length > 0) {
+          for (const item of oldItems) {
+            await purchaseItemsService.remove(item.id);
+          }
+        }
+        // Then update purchase header (possibly changing warehouse)
         const purchaseData = {
           reference,
           date,
@@ -229,14 +236,7 @@ const CreatePurchase = () => {
           total_amount: grandTotal,
         };
         await purchasesService.update(id as string, purchaseData);
-        // Remove old items and insert new
-        // (You may want to optimize this in production)
-        const { data: oldItems } = await purchaseItemsService.getByPurchaseId(id as string);
-        if (oldItems && oldItems.length > 0) {
-          for (const item of oldItems) {
-            await purchaseItemsService.remove(item.id);
-          }
-        }
+        // Finally insert new items so stock is added to the (possibly new) warehouse
         const items = orderItems.map(item => ({
           purchase_id: id,
           product_id: item.id,

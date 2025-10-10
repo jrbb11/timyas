@@ -197,20 +197,51 @@ $$ LANGUAGE plpgsql;
 -- Function to handle purchase stock updates
 CREATE OR REPLACE FUNCTION handle_purchase_stock()
 RETURNS TRIGGER AS $$
+DECLARE
+    old_wh UUID;
+    new_wh UUID;
 BEGIN
-    -- Insert or update warehouse stock
-    INSERT INTO warehouse_stock (warehouse_id, product_id, stock)
-    SELECT 
-        p.warehouse,
-        NEW.product_id,
-        COALESCE(ws.stock, 0) + NEW.qty
-    FROM purchases p
-    LEFT JOIN warehouse_stock ws ON ws.warehouse_id = p.warehouse AND ws.product_id = NEW.product_id
-    WHERE p.id = NEW.purchase_id
-    ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
-        stock = warehouse_stock.stock + NEW.qty;
-    
-    RETURN NEW;
+    IF TG_OP = 'INSERT' THEN
+        -- Increase stock in the purchase's warehouse for the product
+        SELECT warehouse INTO new_wh FROM purchases WHERE id = NEW.purchase_id;
+        INSERT INTO warehouse_stock (warehouse_id, product_id, stock)
+        VALUES (new_wh, NEW.product_id, NEW.qty)
+        ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
+            stock = warehouse_stock.stock + NEW.qty;
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        -- Decrease stock from the (current) purchase's warehouse for the product
+        SELECT warehouse INTO old_wh FROM purchases WHERE id = OLD.purchase_id;
+        UPDATE warehouse_stock 
+        SET stock = stock - OLD.qty
+        WHERE warehouse_id = old_wh AND product_id = OLD.product_id;
+        RETURN OLD;
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Handle qty/product/purchase changes by moving delta appropriately
+        SELECT warehouse INTO old_wh FROM purchases WHERE id = OLD.purchase_id;
+        SELECT warehouse INTO new_wh FROM purchases WHERE id = NEW.purchase_id;
+
+        IF old_wh = new_wh AND OLD.product_id = NEW.product_id THEN
+            -- Same warehouse and product: apply delta
+            UPDATE warehouse_stock 
+            SET stock = stock + (NEW.qty - OLD.qty)
+            WHERE warehouse_id = new_wh AND product_id = NEW.product_id;
+        ELSE
+            -- Different warehouse and/or product: subtract old, add new
+            UPDATE warehouse_stock 
+            SET stock = stock - OLD.qty
+            WHERE warehouse_id = old_wh AND product_id = OLD.product_id;
+
+            INSERT INTO warehouse_stock (warehouse_id, product_id, stock)
+            VALUES (new_wh, NEW.product_id, NEW.qty)
+            ON CONFLICT (warehouse_id, product_id) DO UPDATE SET
+                stock = warehouse_stock.stock + NEW.qty;
+        END IF;
+
+        RETURN NEW;
+    END IF;
+
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -623,7 +654,7 @@ CREATE TABLE public.purchase_items (
   ) TABLESPACE pg_default;
   
 CREATE TRIGGER trg_purchase_stock
-    AFTER INSERT ON purchase_items 
+    AFTER INSERT OR UPDATE OR DELETE ON purchase_items 
     FOR EACH ROW EXECUTE FUNCTION handle_purchase_stock();
 
 -- Purchase payments table
