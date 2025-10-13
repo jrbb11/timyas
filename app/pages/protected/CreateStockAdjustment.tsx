@@ -30,6 +30,7 @@ const CreateStockAdjustment = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [reason, setReason] = useState('');
+  const [notes, setNotes] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
 
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -83,6 +84,7 @@ const CreateStockAdjustment = () => {
         setDate(batch.adjusted_at ? new Date(batch.adjusted_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
         setSelectedWarehouse(batch.warehouse || '');
         setReason(batch.reason || '');
+        setNotes(batch.notes || '');
       }
       // Map adjustment items to adjustmentItems format
       const mapped = (itemsRes.data || []).map((item: any) => ({
@@ -276,6 +278,7 @@ const CreateStockAdjustment = () => {
         const batchData = {
           reference_code: reference,
           reason,
+          notes,
           warehouse: selectedWarehouse,
           adjusted_at: date,
           adjusted_by: adjustedByPersonId,
@@ -292,6 +295,7 @@ const CreateStockAdjustment = () => {
         const batchData = {
           reference_code: reference,
           reason,
+          notes,
           warehouse: selectedWarehouse,
           adjusted_at: date,
           adjusted_by: adjustedByPersonId,
@@ -472,6 +476,17 @@ const CreateStockAdjustment = () => {
                 placeholder="Enter reason for stock adjustment..."
               />
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Notes</label>
+            <textarea
+              className="w-full border rounded px-3 py-2"
+              rows={3}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Enter additional notes or details about this stock adjustment..."
+            />
           </div>
 
           <div className="relative">

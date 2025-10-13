@@ -147,6 +147,12 @@ const StockAdjustmentView = () => {
                 <label className="block text-sm font-medium text-gray-600">Reason</label>
                 <p className="text-lg">{adjustment.reason || 'No reason provided'}</p>
               </div>
+              {adjustment.notes && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-600">Notes</label>
+                  <p className="text-lg whitespace-pre-wrap">{adjustment.notes}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

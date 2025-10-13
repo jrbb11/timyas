@@ -782,6 +782,7 @@ CREATE TABLE public.adjustment_batches (
     id UUID NOT NULL DEFAULT gen_random_uuid(),
     reference_code TEXT NULL,
     reason TEXT NULL,
+    notes TEXT NULL,
     adjusted_by UUID NULL,
     adjusted_at TIMESTAMP WITH TIME ZONE NULL DEFAULT timezone('Asia/Manila'::TEXT, NOW()),
     warehouse UUID NOT NULL,

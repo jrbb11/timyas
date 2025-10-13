@@ -37,7 +37,8 @@ const AllStockAdjustments = () => {
     return (
       adjustment.reference_code?.toLowerCase().includes(searchTerm) ||
       adjustment.warehouse?.name?.toLowerCase().includes(searchTerm) ||
-      adjustment.reason?.toLowerCase().includes(searchTerm)
+      adjustment.reason?.toLowerCase().includes(searchTerm) ||
+      adjustment.notes?.toLowerCase().includes(searchTerm)
     );
   });
 
@@ -151,6 +152,7 @@ const AllStockAdjustments = () => {
                 <th className="p-4 text-left font-semibold">Date</th>
                 <th className="p-4 text-left font-semibold">Warehouse</th>
                 <th className="p-4 text-left font-semibold">Reason</th>
+                <th className="p-4 text-left font-semibold">Notes</th>
                 <th className="p-4 text-left font-semibold">Adjusted By</th>
                 <th className="p-4 text-center font-semibold">Actions</th>
               </tr>
@@ -158,7 +160,7 @@ const AllStockAdjustments = () => {
             <tbody>
               {paginatedAdjustments.length === 0 ? (
                 <tr>
-                  <td className="p-6 text-center text-gray-400" colSpan={6}>No stock adjustments found</td>
+                  <td className="p-6 text-center text-gray-400" colSpan={7}>No stock adjustments found</td>
                 </tr>
               ) : (
                 paginatedAdjustments.map((adjustment) => (
@@ -167,6 +169,9 @@ const AllStockAdjustments = () => {
                     <td className="p-4">{new Date(adjustment.adjusted_at).toLocaleDateString()}</td>
                     <td className="p-4">{adjustment.warehouse?.name || 'N/A'}</td>
                     <td className="p-4 text-gray-600">{adjustment.reason || 'No reason provided'}</td>
+                    <td className="p-4 text-gray-500 max-w-xs truncate" title={adjustment.notes || ''}>
+                      {adjustment.notes || 'No notes'}
+                    </td>
                     <td className="p-4">{adjustment.adjusted_by?.name || 'System'}</td>
                     <td className="p-4 text-center">
                       <div className="flex gap-1 justify-center">
