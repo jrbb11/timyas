@@ -331,7 +331,7 @@ const CreateSale = () => {
       // 1. Insert sale
       const saleData = {
         invoice_number: invoiceNumber,
-        date: new Date().toISOString().slice(0, 10),
+        date,
         people_branches_id: selectedPeopleBranch,
         warehouse: selectedWarehouse,
         order_tax: orderTaxPercent,
@@ -486,7 +486,14 @@ const CreateSale = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Date *</label>
-              <input type="date" className="w-full border rounded px-3 py-2" defaultValue={new Date().toISOString().slice(0,10)} required />
+              <input 
+                type="date" 
+                className="w-full border rounded px-3 py-2" 
+                value={date} 
+                onChange={e => setDate(e.target.value)} 
+                required 
+                disabled={!isEditable && !canEditStatus}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Customer & Branch *</label>
