@@ -55,7 +55,7 @@ const PurchaseView = () => {
       else {
         setAuditLogs(data || []);
         // Fetch user names for all user_ids in logs
-        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id))) as string[];
         if (userIds.length) {
           const users = await customersService.getUsersByIds(userIds);
           const map: Record<string, string> = {};

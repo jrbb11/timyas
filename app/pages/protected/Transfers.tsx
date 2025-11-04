@@ -39,7 +39,7 @@ const Transfers = () => {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editTransfer) {
-      setTransfers(transfers.map(t => t.id === editTransfer.id ? { ...form, id: editTransfer.id } : t));
+      setTransfers(transfers.map((t: any) => t.id === (editTransfer as any).id ? { ...form, id: (editTransfer as any).id } : t));
     } else {
       setTransfers([...transfers, { ...form, id: Date.now() }]);
     }
@@ -166,7 +166,7 @@ const Transfers = () => {
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">From</label>
                   <UniversalSelect
-                    value={accounts.find((acc: Account) => acc.id === form.from) ? { value: form.from, label: accounts.find((acc: Account) => acc.id === form.from)?.name } as import('../components/ui/UniversalSelect').UniversalSelectOption : null}
+                    value={accounts.find((acc: Account) => acc.id === form.from) ? { value: form.from, label: accounts.find((acc: Account) => acc.id === form.from)?.name } as import('../../components/ui/UniversalSelect').UniversalSelectOption : null}
                     onChange={option => setForm({ ...form, from: option ? option.value : '' })}
                     options={accounts.map((acc: Account) => ({ value: acc.id, label: acc.name }))}
                     placeholder="Select account..."
@@ -177,7 +177,7 @@ const Transfers = () => {
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">To</label>
                   <UniversalSelect
-                    value={accounts.find((acc: Account) => acc.id === form.to) ? { value: form.to, label: accounts.find((acc: Account) => acc.id === form.to)?.name } as import('../components/ui/UniversalSelect').UniversalSelectOption : null}
+                    value={accounts.find((acc: Account) => acc.id === form.to) ? { value: form.to, label: accounts.find((acc: Account) => acc.id === form.to)?.name } as import('../../components/ui/UniversalSelect').UniversalSelectOption : null}
                     onChange={option => setForm({ ...form, to: option ? option.value : '' })}
                     options={accounts.map((acc: Account) => ({ value: acc.id, label: acc.name }))}
                     placeholder="Select account..."
@@ -199,7 +199,7 @@ const Transfers = () => {
                 </div>
                 <div className="flex items-center justify-between pt-4 gap-2">
                   {editTransfer && (
-                    <button type="button" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-100" onClick={() => handleDelete(editTransfer.id)}>Delete</button>
+                    <button type="button" className="bg-red-50 text-red-600 px-4 py-2 rounded-lg font-semibold hover:bg-red-100" onClick={() => handleDelete((editTransfer as any).id)}>Delete</button>
                   )}
                   <div className="flex gap-2 ml-auto">
                     <button type="button" className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold" onClick={closeModal}>Cancel</button>

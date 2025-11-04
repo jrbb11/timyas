@@ -52,7 +52,7 @@ export const salesService = {
     }
   },
   async getView() {
-    return supabase.from('sales_view').select('*');
+    return supabase.from('sales_view').select('*', { count: 'exact' }).order('date', { ascending: false }).limit(10000);
   },
   async getByInvoiceNumber(invoice_number: string) {
     return supabase.from('sales').select('*').eq('invoice_number', invoice_number);
@@ -104,7 +104,7 @@ export interface SalesByCustomer {
 export async function getSalesByCustomer(): Promise<SalesByCustomer[]> {
   const { data, error } = await supabase
     .from('sales_view')
-    .select('customer, total_amount, paid, due')
+    .select('customer, total_amount, paid, due, shipping')
     .neq('customer', null);
 
   if (error) throw error;
@@ -114,11 +114,26 @@ export async function getSalesByCustomer(): Promise<SalesByCustomer[]> {
     if (!grouped[row.customer]) {
       grouped[row.customer] = { customer: row.customer, total_sales: 0, total_paid: 0, total_due: 0 };
     }
-    const totalAmount = row.total_amount || 0;
-    const shipping = row.shipping || 0;
-    grouped[row.customer].total_sales += (totalAmount - shipping);
-    grouped[row.customer].total_paid += row.paid || 0;
-    grouped[row.customer].total_due += row.due || 0;
+    const totalAmount = Number(row.total_amount) || 0;
+    const shipping = Number(row.shipping) || 0;
+    const paid = Number(row.paid) || 0;
+    
+    // Calculate sales excluding shipping
+    const salesAmount = totalAmount - shipping;
+    
+    // Adjust paid to exclude shipping proportionally
+    let adjustedPaid = 0;
+    if (totalAmount > 0) {
+      const paidRatio = paid / totalAmount;
+      adjustedPaid = salesAmount * paidRatio;
+    }
+    
+    // Due is the remaining amount
+    const adjustedDue = salesAmount - adjustedPaid;
+    
+    grouped[row.customer].total_sales += salesAmount;
+    grouped[row.customer].total_paid += adjustedPaid;
+    grouped[row.customer].total_due += adjustedDue;
   });
   return Object.values(grouped);
 } 

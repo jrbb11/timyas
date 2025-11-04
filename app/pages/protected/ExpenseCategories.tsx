@@ -6,7 +6,7 @@ const ExpenseCategories = () => {
   const [categories, setCategories] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [editCategory, setEditCategory] = useState(null);
+  const [editCategory, setEditCategory] = useState<any | null>(null);
   const [form, setForm] = useState({ name: '' });
   const [selected, setSelected] = useState<any[]>([]);
 
@@ -17,23 +17,23 @@ const ExpenseCategories = () => {
     setForm({ name: '' });
     setModalOpen(true);
   };
-  const openEdit = (cat) => {
+  const openEdit = (cat: any) => {
     setEditCategory(cat);
     setForm({ name: cat.name });
     setModalOpen(true);
   };
   const closeModal = () => setModalOpen(false);
-  const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
-  const handleSubmit = e => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editCategory) {
-      setCategories(categories.map(c => c.id === editCategory.id ? { ...form, id: editCategory.id } : c));
+      setCategories(categories.map((c: any) => c.id === editCategory.id ? { ...form, id: editCategory.id } : c));
     } else {
       setCategories([...categories, { ...form, id: Date.now() }]);
     }
     setModalOpen(false);
   };
-  const handleDelete = id => setCategories(categories.filter(c => c.id !== id));
+  const handleDelete = (id: any) => setCategories(categories.filter((c: any) => c.id !== id));
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
       setSelected(filtered.map(c => c.id));

@@ -10,7 +10,8 @@ export const productsService = {
         product_unit:units!product_unit(name, short_name), 
         sale_unit:units!sale_unit(name, short_name), 
         purchase_unit:units!purchase_unit(name, short_name)
-      `);
+      `)
+      .limit(10000);
   },
   async getById(id: string) {
     return supabase.from('products').select('*').eq('id', id).single();

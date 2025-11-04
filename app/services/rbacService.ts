@@ -118,12 +118,12 @@ export class RBACService {
     
     if (error) throw error;
     
-    return data?.map(item => ({
+    return data?.map((item: any) => ({
       id: item.id,
       app_user_id: item.app_user_id,
       role_id: item.role_id,
-      role_name: item.roles.name,
-      role_level: item.roles.level,
+      role_name: (item.roles as { name: string; level: number }).name,
+      role_level: (item.roles as { name: string; level: number }).level,
       assigned_by: item.assigned_by,
       assigned_at: item.assigned_at,
       is_active: item.is_active
@@ -253,7 +253,10 @@ export class RBACService {
     
     if (error) throw error;
     
-    return data?.map(item => item.permissions).filter(p => p.is_active) || [];
+    return data?.map((item: any) => {
+      const permission = item.permissions as Permission;
+      return permission;
+    }).filter((p: Permission) => p.is_active) || [];
   }
 
   static async addPermissionToRole(roleId: string, permissionId: string): Promise<void> {

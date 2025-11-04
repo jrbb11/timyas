@@ -77,6 +77,7 @@ interface PermissionButtonProps {
   className?: string;
   disabled?: boolean;
   fallback?: React.ReactNode;
+  style?: React.CSSProperties;
 }
 
 export const PermissionButton: React.FC<PermissionButtonProps> = ({
@@ -86,12 +87,13 @@ export const PermissionButton: React.FC<PermissionButtonProps> = ({
   onClick,
   className = '',
   disabled = false,
-  fallback = null
+  fallback = null,
+  style
 }) => {
   const { hasPermission, loading } = useUserPermissions();
 
   if (loading) {
-    return <button disabled className={className}>Loading...</button>;
+    return <button disabled className={className} style={style}>Loading...</button>;
   }
 
   if (!hasPermission(resource, action)) {
@@ -103,6 +105,7 @@ export const PermissionButton: React.FC<PermissionButtonProps> = ({
       onClick={onClick}
       className={className}
       disabled={disabled}
+      style={style}
     >
       {children}
     </button>

@@ -158,7 +158,7 @@ const Customers = () => {
       if (error) setAuditError(error.message);
       else {
         setAuditLogs(data || []);
-        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id)));
+        const userIds = Array.from(new Set((data || []).map((log: any) => log.user_id))) as string[];
         if (userIds.length) {
           const users = await customersService.getUsersByIds(userIds);
           const map: Record<string, string> = {};
@@ -195,6 +195,36 @@ const Customers = () => {
     setShowDeleteConfirm(false);
     setCustomerToDelete(null);
     setLoadingAction(false);
+  };
+
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditForm({
+      ...editForm,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setEditLoading(true);
+    setEditError(null);
+    setEditSuccess(false);
+
+    const user = await getCurrentUser();
+    const { error } = await customersService.update(editForm.id, editForm, user?.id);
+    
+    if (error) {
+      setEditError(error.message);
+      setEditLoading(false);
+    } else {
+      setEditSuccess(true);
+      setEditLoading(false);
+      setShowEditModal(false);
+      // Refresh the customers list
+      customersService.getAll().then(({ data, error }) => {
+        if (!error) setCustomers(data || []);
+      });
+    }
   };
 
   const handleExportCSV = () => {
@@ -408,7 +438,7 @@ const Customers = () => {
         </div>
         {/* View Modal */}
         {viewCustomer && (
-          <Modal isOpen={!!viewCustomer} onClose={() => setViewCustomer(null)} title={null}>
+          <Modal isOpen={!!viewCustomer} onClose={() => setViewCustomer(null)} title={undefined}>
             <div className="flex flex-col gap-6">
               {/* Franchisee summary */}
               <div className="flex flex-col md:flex-row md:items-center gap-4 border-b pb-4">

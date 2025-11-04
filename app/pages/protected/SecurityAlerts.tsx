@@ -43,7 +43,10 @@ const SecurityAlerts = () => {
 
   useEffect(() => {
     if (!securityLoading) {
-      setAlerts(securityEvents);
+      setAlerts(securityEvents.map(event => ({
+        ...event,
+        description: event.description || ''
+      })));
       setLoading(false);
     }
   }, [securityEvents, securityLoading]);
@@ -115,7 +118,10 @@ const SecurityAlerts = () => {
   const filteredAlerts = alerts.filter(alert => {
     if (filters.severity && alert.severity !== filters.severity) return false;
     if (filters.event_type && alert.event_type !== filters.event_type) return false;
-    if (filters.resolved !== undefined && alert.resolved !== (filters.resolved === 'true')) return false;
+    if (filters.resolved !== undefined) {
+      const resolvedValue = typeof filters.resolved === 'string' ? filters.resolved === 'true' : filters.resolved;
+      if (alert.resolved !== resolvedValue) return false;
+    }
     return true;
   });
 

@@ -261,7 +261,7 @@ const AllPurchases = () => {
                   <div className="absolute z-50 mt-2 bg-white rounded shadow-lg p-2" ref={datePickerRef}>
                     <DateRange
                       editableDateInputs={true}
-                      onChange={item => setDateRange([item.selection])}
+                      onChange={(item: any) => setDateRange([item.selection])}
                       moveRangeOnFirstSelection={false}
                       ranges={dateRange}
                       maxDate={new Date()}

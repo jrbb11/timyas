@@ -15,13 +15,11 @@ import { PermissionGuard } from '../../components/PermissionComponents';
 const Dashboard = () => {
   const [totalPurchaseAmount, setTotalPurchaseAmount] = useState(0);
   const [totalSalesAmount, setTotalSalesAmount] = useState(0);
-  const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalFranchisees, setTotalFranchisees] = useState(0);
   
   // Previous period data for comparison
   const [prevPurchaseAmount, setPrevPurchaseAmount] = useState(0);
   const [prevSalesAmount, setPrevSalesAmount] = useState(0);
-  const [prevRevenue, setPrevRevenue] = useState(0);
   const [prevFranchisees, setPrevFranchisees] = useState(0);
   
   const [pieData, setPieData] = useState<PieDataType[]>([]);
@@ -29,7 +27,8 @@ const Dashboard = () => {
   const [filterType, setFilterType] = useState<'day' | 'week' | 'month' | 'year'>('month');
   const [filterValue, setFilterValue] = useState<string>(() => {
     const now = new Date();
-    return `${now.getFullYear()}-08`; // Default to August 2025 since that's when your data is
+    // Default to current month (YYYY-MM format)
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [search, setSearch] = useState<string>('');
 
@@ -90,8 +89,30 @@ const Dashboard = () => {
   };
 
   // Helper to check if a date is in the selected range
-  function isInRange(dateStr: string) {
-    const date = new Date(dateStr);
+  function isInRange(dateStr: string | Date) {
+    // Normalize date to Date object
+    let date: Date;
+    if (dateStr instanceof Date) {
+      date = dateStr;
+    } else if (typeof dateStr === 'string') {
+      // Handle different date formats - try parsing as YYYY-MM-DD first
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+        date = new Date(dateStr);
+      } else if (dateStr.includes('T')) {
+        date = new Date(dateStr.split('T')[0]);
+      } else {
+        date = new Date(dateStr);
+      }
+    } else {
+      return false;
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date:', dateStr);
+      return false;
+    }
+    
     if (filterType === 'day') {
       return date.toISOString().slice(0, 10) === filterValue;
     } else if (filterType === 'week') {
@@ -103,7 +124,8 @@ const Dashboard = () => {
       const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
       return d.getFullYear() === Number(year) && weekNum === Number(week);
     } else if (filterType === 'month') {
-      return date.toISOString().slice(0, 7) === filterValue;
+      const dateMonth = date.toISOString().slice(0, 7);
+      return dateMonth === filterValue;
     } else if (filterType === 'year') {
       return date.getFullYear().toString() === filterValue;
     }
@@ -156,7 +178,20 @@ const Dashboard = () => {
       }
     });
     
-    salesService.getAll().then(({ data }) => {
+    // Fetch sales data for the selected period
+    (filterType === 'month' && filterValue
+      ? (() => {
+          const [year, month] = filterValue.split('-');
+          const daysInMonth = new Date(Number(year), Number(month), 0).getDate();
+          return supabase
+            .from('sales_view')
+            .select('*')
+            .gte('date', `${filterValue}-01`)
+            .lte('date', `${filterValue}-${daysInMonth.toString().padStart(2, '0')}`)
+            .order('date', { ascending: false });
+        })()
+      : salesService.getView()
+    ).then(({ data }) => {
       if (data) {
         // Filter sales by current period
         const filteredSales = data.filter((sale: any) => isInRange(sale.date));
@@ -167,7 +202,6 @@ const Dashboard = () => {
           return acc + (totalAmount - shipping);
         }, 0);
         setTotalSalesAmount(sum);
-        setTotalRevenue(sum);
         
         // Filter sales by previous period
         const prevFilteredSales = data.filter((sale: any) => isInPreviousRange(sale.date, prevFilterValue, filterType));
@@ -177,12 +211,12 @@ const Dashboard = () => {
           return acc + (totalAmount - shipping);
         }, 0);
         setPrevSalesAmount(prevSum);
-        setPrevRevenue(prevSum);
+        
+        // Calculate Total Revenue = Sales - Purchases (will be calculated after purchases are fetched)
+        // For now, we'll calculate it in the stats display
       } else {
         setTotalSalesAmount(0);
-        setTotalRevenue(0);
         setPrevSalesAmount(0);
-        setPrevRevenue(0);
       }
     });
     
@@ -200,49 +234,123 @@ const Dashboard = () => {
     });
 
     // Fetch and aggregate for pie chart and customer sales
-    Promise.all([
-      saleItemsService.getAll(),
-      productsService.getAll(),
-      categoriesService.getAll(),
-      salesService.getAll(),
-      purchasesService.getAll(),
-      customersService.getAll(),
-    ]).then(([
-      saleItemsRes,
-      productsRes,
-      categoriesRes,
-      salesRes,
-      purchasesRes,
-      customersRes
-    ]: any[]) => {
-      const saleItems: any[] = saleItemsRes.data || [];
-      const products: any[] = productsRes.data || [];
-      const categories: any[] = categoriesRes.data || [];
-      const sales: any[] = salesRes.data || [];
-      const purchases: any[] = purchasesRes.data || [];
-      const customers: any[] = customersRes.data || [];
+    // For month filter, we need to fetch sales first to get their IDs, then fetch sale_items
+    const fetchData = async () => {
+      try {
+        if (filterType === 'month' && filterValue) {
+          // Fetch sales first to get their IDs
+          const [year, month] = filterValue.split('-');
+          const daysInMonth = new Date(Number(year), Number(month), 0).getDate();
+          const salesQuery = supabase
+            .from('sales_view')
+            .select('*')
+            .gte('date', `${filterValue}-01`)
+            .lte('date', `${filterValue}-${daysInMonth.toString().padStart(2, '0')}`)
+            .order('date', { ascending: false });
+          
+          const salesRes = await salesQuery;
+          if (salesRes.error) {
+            console.error('Error fetching sales:', salesRes.error);
+            throw salesRes.error;
+          }
+          const sales = salesRes.data || [];
+          
+          // Fetch sale_items for these sales
+          const saleIds = sales.map(s => s.id);
+          let saleItemsRes;
+          if (saleIds.length > 0) {
+            // Supabase .in() has a limit, so we need to batch if there are too many IDs
+            if (saleIds.length > 1000) {
+              // Split into batches of 1000
+              const batches = [];
+              for (let i = 0; i < saleIds.length; i += 1000) {
+                batches.push(saleIds.slice(i, i + 1000));
+              }
+              const batchResults = await Promise.all(
+                batches.map(batch => supabase.from('sale_items').select('*').in('sale_id', batch).limit(10000))
+              );
+              saleItemsRes = {
+                data: batchResults.flatMap(r => r.data || []),
+                error: batchResults.find(r => r.error)?.error || null
+              };
+            } else {
+              saleItemsRes = await supabase.from('sale_items').select('*').in('sale_id', saleIds).limit(10000);
+            }
+            if (saleItemsRes.error) {
+              console.error('Error fetching sale_items:', saleItemsRes.error);
+              // Don't throw, just use empty array
+              saleItemsRes = { data: [], error: null };
+            }
+          } else {
+            saleItemsRes = { data: [], error: null };
+          }
+          
+          // Fetch other data
+          const [productsRes, categoriesRes, purchasesRes, customersRes] = await Promise.all([
+            productsService.getAll(),
+            categoriesService.getAll(),
+            purchasesService.getAll(),
+            customersService.getAll(),
+          ]);
+          
+          return {
+            saleItems: saleItemsRes.data || [],
+            products: productsRes.data || [],
+            categories: categoriesRes.data || [],
+            sales: sales,
+            purchases: purchasesRes.data || [],
+            customers: customersRes.data || [],
+          };
+        } else {
+          // No filter, fetch all
+          const [saleItemsRes, productsRes, categoriesRes, salesRes, purchasesRes, customersRes] = await Promise.all([
+            saleItemsService.getAll(),
+            productsService.getAll(),
+            categoriesService.getAll(),
+            salesService.getView(),
+            purchasesService.getAll(),
+            customersService.getAll(),
+          ]);
+          
+          return {
+            saleItems: saleItemsRes.data || [],
+            products: productsRes.data || [],
+            categories: categoriesRes.data || [],
+            sales: salesRes.data || [],
+            purchases: purchasesRes.data || [],
+            customers: customersRes.data || [],
+          };
+        }
+      } catch (error) {
+        console.error('Error in fetchData:', error);
+        // Return empty data on error
+        return {
+          saleItems: [],
+          products: [],
+          categories: [],
+          sales: [],
+          purchases: [],
+          customers: [],
+        };
+      }
+    };
+    
+    fetchData().then(({ saleItems, products, categories, sales, purchases, customers }) => {
 
-      // Debug logs
-      console.log('Products:', products);
-      console.log('Categories:', categories);
-      console.log('SaleItems:', saleItems);
 
       // Map productId to categoryId (use .id if category is an object)
       const productIdToCategory = Object.fromEntries(products.map(p => [p.id, p.category?.id || p.category]));
       // Map categoryId to name
       const categoryIdToName = Object.fromEntries(categories.map(c => [c.id, c.name]));
-      console.log('productIdToCategory:', productIdToCategory);
-      console.log('categoryIdToName:', categoryIdToName);
 
-      // Filter sale items and sales by date
-      const filteredSaleItems = saleItems.filter((item: any) => {
-        const sale = sales.find((s: any) => s.id === item.sale_id);
-        return sale && isInRange(sale.date);
-      });
+      // Filter sales by date first
       const filteredSales = sales.filter((sale: any) => isInRange(sale.date));
       
-      console.log('Filtered SaleItems:', filteredSaleItems);
-      console.log('Filtered Sales:', filteredSales);
+      // Get sale IDs for filtered sales
+      const filteredSaleIds = new Set(filteredSales.map((s: any) => s.id));
+      
+      // Filter sale items by matching sale_id with filtered sales
+      const filteredSaleItems = saleItems.filter((item: any) => filteredSaleIds.has(item.sale_id));
 
       // For bar chart, use a separate variable to avoid redeclaration
       const filteredSalesForChart = sales.filter((sale: any) => isInRange(sale.date));
@@ -250,22 +358,36 @@ const Dashboard = () => {
       // Group sales and purchases by group label
       const salesByGroup: Record<string, number> = {};
       filteredSalesForChart.forEach((sale: any) => {
+        // Normalize date to YYYY-MM-DD format
+        let dateStr = sale.date;
+        if (dateStr instanceof Date) {
+          dateStr = dateStr.toISOString().slice(0, 10);
+        } else if (typeof dateStr === 'string') {
+          // Handle different date formats
+          if (dateStr.includes('T')) {
+            dateStr = dateStr.split('T')[0];
+          } else if (dateStr.length > 10) {
+            dateStr = dateStr.slice(0, 10);
+          }
+        }
+        
         let label;
         if (filterType === 'day') {
-          label = sale.date; // Use full date for day view
+          label = dateStr; // Use full date for day view
         } else if (filterType === 'week') {
-          label = sale.date; // Use full date for week view
+          label = dateStr; // Use full date for week view
         } else if (filterType === 'month') {
-          label = sale.date; // Use full date for month view
+          label = dateStr; // Use full date (YYYY-MM-DD) for month view to show daily breakdown
         } else if (filterType === 'year') {
-          label = sale.date.slice(0, 7); // Use YYYY-MM format for year view
+          label = dateStr.slice(0, 7); // Use YYYY-MM format for year view
         } else {
-          label = getGroupLabel(sale.date); // Fallback
+          label = getGroupLabel(dateStr); // Fallback
         }
         const totalAmount = Number(sale.total_amount) || 0;
         const shipping = Number(sale.shipping) || 0;
         salesByGroup[label] = (salesByGroup[label] || 0) + (totalAmount - shipping);
       });
+      
       const purchasesByGroup: Record<string, number> = {};
       filteredPurchasesForChart.forEach((purchase: any) => {
         const label = getGroupLabel(purchase.date);
@@ -331,22 +453,56 @@ const Dashboard = () => {
         }
       }
       setBarData(barDataArr);
-      console.log('Filter Type:', filterType);
-      console.log('Filter Value:', filterValue);
-      console.log('Sales by Group:', salesByGroup);
-      // Ensure stat card matches chart: sum all revenues in barDataArr
-      const totalRevenueValue = barDataArr.reduce((acc: number, d: any) => acc + (Number(d.revenue) || 0), 0);
-      setTotalRevenue(totalRevenueValue);
 
       // Aggregate sales by category
+      // Calculate category totals from sales directly, distributing proportionally by items
       const categoryTotals: Record<string, number> = {};
+      
+      // First pass: calculate item totals per sale for proportions
+      const saleItemTotals: Record<string, number> = {}; // sale_id -> total item amount
       filteredSaleItems.forEach(item => {
-        const catId = productIdToCategory[item.product_id];
-        if (!catId) return;
-        const catName = categoryIdToName[catId] || 'Unknown';
-        // Calculate actual sales amount: (price * qty) - discount + tax
+        const saleId = item.sale_id;
         const itemTotal = (Number(item.price) || 0) * (Number(item.qty) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
-        categoryTotals[catName] = (categoryTotals[catName] || 0) + itemTotal;
+        saleItemTotals[saleId] = (saleItemTotals[saleId] || 0) + itemTotal;
+      });
+      
+      // Second pass: distribute sale amounts to categories proportionally
+      filteredSales.forEach(sale => {
+        const saleId = sale.id;
+        const saleTotalAmount = Number(sale.total_amount) || 0;
+        const saleShipping = Number(sale.shipping) || 0;
+        const saleNetAmount = saleTotalAmount - saleShipping;
+        
+        // Get all items for this sale
+        const saleItems = filteredSaleItems.filter((item: any) => item.sale_id === saleId);
+        const saleItemsTotal = saleItemTotals[saleId] || 0;
+        
+        if (saleItems.length === 0) {
+          // Sales without items - add to "Uncategorized"
+          categoryTotals['Uncategorized'] = (categoryTotals['Uncategorized'] || 0) + saleNetAmount;
+          return;
+        }
+        
+        // Distribute sale net amount proportionally among items
+        saleItems.forEach((item: any) => {
+          const catId = productIdToCategory[item.product_id];
+          const catName = catId ? (categoryIdToName[catId] || 'Unknown') : 'Uncategorized';
+          
+          const itemTotal = (Number(item.price) || 0) * (Number(item.qty) || 0) - (Number(item.discount) || 0) + (Number(item.tax) || 0);
+          
+          let categoryAmount = 0;
+          if (saleItemsTotal > 0) {
+            // Proportion of this item in the sale
+            const itemProportion = itemTotal / saleItemsTotal;
+            // Apply proportion to sale net amount
+            categoryAmount = saleNetAmount * itemProportion;
+          } else {
+            // Fallback: distribute equally
+            categoryAmount = saleNetAmount / saleItems.length;
+          }
+          
+          categoryTotals[catName] = (categoryTotals[catName] || 0) + categoryAmount;
+        });
       });
       // Assign colors
       const colors = [
@@ -357,24 +513,20 @@ const Dashboard = () => {
         value: Number(value),
         color: colors[idx % colors.length],
       }));
-      console.log('Category Totals:', categoryTotals);
-      console.log('Pie Data:', pieDataArr);
       setPieData(pieDataArr);
 
-      // Map customerId to name
-      const customerIdToName = Object.fromEntries(customers.map(c => [c.id, c.name]));
-      // Aggregate sales by customer
+      // Aggregate sales by customer (from sales_view, customer is already the name)
       const customerTotals: Record<string, number> = {};
       filteredSales.forEach(sale => {
-        const custId = sale.customer;
-        if (!custId) return;
+        const customerName = sale.customer; // sales_view has customer as name, not ID
+        if (!customerName) return;
         const totalAmount = Number(sale.total_amount) || 0;
         const shipping = Number(sale.shipping) || 0;
-        customerTotals[custId] = (customerTotals[custId] || 0) + (totalAmount - shipping);
+        customerTotals[customerName] = (customerTotals[customerName] || 0) + (totalAmount - shipping);
       });
       // Convert to array and sort
-      const customerArr = Object.entries(customerTotals).map(([id, value]) => ({
-        name: customerIdToName[id] || 'Unknown',
+      const customerArr = Object.entries(customerTotals).map(([name, value]) => ({
+        name: name,
         value: Number(value),
       })).sort((a, b) => b.value - a.value);
       // Calculate percentages
@@ -385,10 +537,8 @@ const Dashboard = () => {
       })).slice(0, 8); // Top 8 customers
       setCustomerSales(customerSalesArr);
 
-      // Debug logs for sales chart
-      console.log('All sales:', sales);
-      console.log('filteredSalesForChart:', filteredSalesForChart);
-      console.log('barDataArr:', barDataArr);
+    }).catch((error) => {
+      console.error('Error in fetchData promise:', error);
     });
   }, [filterType, filterValue]);
 
@@ -453,7 +603,7 @@ const Dashboard = () => {
                       const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
                       newValue = `${year}-W${weekNum.toString().padStart(2, '0')}`;
                     } else if (type === 'month') {
-                      newValue = now.toISOString().slice(0, 7); // YYYY-MM
+                      newValue = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
                     } else if (type === 'year') {
                       newValue = now.getFullYear().toString(); // YYYY
                     }
@@ -561,8 +711,15 @@ const Dashboard = () => {
               <h2 className="text-lg font-semibold mb-4">Sales Overview</h2>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <XAxis dataKey="date" fontSize={12} />
+                  <BarChart data={barData} margin={{ top: 10, right: 30, left: 0, bottom: 60 }}>
+                    <XAxis 
+                      dataKey="date" 
+                      fontSize={12}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      interval={filterType === 'month' ? 0 : 'preserveStartEnd'}
+                    />
                     <YAxis fontSize={12} tickFormatter={value => `₱${Number(value).toLocaleString()}`} />
                     <Tooltip formatter={value => `₱${Number(value).toLocaleString()}`} />
                     <Legend />
@@ -646,7 +803,7 @@ const Dashboard = () => {
               <div className="bg-white shadow rounded-lg p-6 flex flex-col lg:col-span-2">
                 <h2 className="text-lg font-semibold mb-4">Sales by customers</h2>
                 <div className="flex flex-col gap-4 h-full">
-                  <SalesByCustomerTable />
+                  <SalesByCustomerTable filterValue={filterValue} filterType={filterType} />
                 </div>
               </div>
             </PermissionGuard>

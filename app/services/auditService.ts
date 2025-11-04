@@ -369,28 +369,28 @@ export const useAuditTrail = (filters: AuditFilters = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchAuditTrail = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await AuditService.getAuditTrail(filters);
-        
-        if (error) {
-          setError(error.message);
-        } else {
-          setAuditLogs(data || []);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch audit trail');
-      } finally {
-        setLoading(false);
+  const fetchAuditTrail = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await AuditService.getAuditTrail(filters);
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setAuditLogs(data || []);
       }
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch audit trail');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchAuditTrail();
   }, [filters.resource, filters.resource_id, filters.user_id, filters.action, filters.start_date, filters.end_date]);
 
-  return { auditLogs, loading, error, refetch: () => fetchAuditTrail() };
+  return { auditLogs, loading, error, refetch: fetchAuditTrail };
 };
 
 // Hook for getting security events
@@ -399,28 +399,28 @@ export const useSecurityEvents = (filters: SecurityEventFilters = {}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSecurityEvents = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await AuditService.getSecurityEvents(filters);
-        
-        if (error) {
-          setError(error.message);
-        } else {
-          setSecurityEvents(data || []);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch security events');
-      } finally {
-        setLoading(false);
+  const fetchSecurityEvents = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await AuditService.getSecurityEvents(filters);
+      
+      if (error) {
+        setError(error.message);
+      } else {
+        setSecurityEvents(data || []);
       }
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch security events');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchSecurityEvents();
   }, [filters.event_type, filters.severity, filters.resolved, filters.start_date, filters.end_date]);
 
-  return { securityEvents, loading, error, refetch: () => fetchSecurityEvents() };
+  return { securityEvents, loading, error, refetch: fetchSecurityEvents };
 };
 
 export default AuditService;

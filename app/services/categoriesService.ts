@@ -2,7 +2,7 @@ import { supabase } from '../utils/supabaseClient';
 
 export const categoriesService = {
   async getAll() {
-    return supabase.from('categories').select('*');
+    return supabase.from('categories').select('*').limit(10000);
   },
   async getById(id: string) {
     return supabase.from('categories').select('*').eq('id', id).single();

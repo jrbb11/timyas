@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import { supabase } from '../../utils/supabaseClient';
-import { RBACService, Role, UserRole } from '../../services/rbacService';
+import { RBACService } from '../../services/rbacService';
+import type { Role, UserRole } from '../../services/rbacService';
 import { PermissionGuard, RoleGuard, AdminPanel } from '../../components/PermissionComponents';
 import { FaEdit, FaTrash, FaUserPlus, FaShieldAlt } from 'react-icons/fa';
 
