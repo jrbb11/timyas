@@ -16,8 +16,25 @@ function formatCurrency(amount: number) {
   return amount.toLocaleString('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 });
 }
 
+function formatDateISO(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultDateRange() {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return {
+    from: formatDateISO(firstDay),
+    to: formatDateISO(lastDay),
+  };
+}
+
 const Reports = () => {
-  const [dateRange, setDateRange] = useState({ from: '', to: '' });
+  const [dateRange, setDateRange] = useState(getDefaultDateRange);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,8 +50,13 @@ const Reports = () => {
   const [saleItems, setSaleItems] = useState<any[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<any[]>([]);
   const [adjustments, setAdjustments] = useState<any[]>([]);
+  const [productSalesReportData, setProductSalesReportData] = useState<any[]>([]);
+  const [productPurchaseReportData, setProductPurchaseReportData] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!dateRange.from || !dateRange.to) {
+      return;
+    }
     setLoading(true);
     setError(null);
     Promise.all([
@@ -46,9 +68,32 @@ const Reports = () => {
       brandsService.getAll(),
       unitsService.getAll(),
       customersService.getAll(),
-      supabase.from('sale_items').select('*, product:products(id, name, code), sale:sales(id, date)'),
-      supabase.from('purchase_items').select('*, product:products(id, name, code), purchase:purchases(id, date)'),
-      supabase.from('product_adjustments').select('*, product:products(id, name, code), adjustment_batch:adjustment_batches(id, adjusted_at)'),
+      supabase
+        .from('sale_items')
+        .select('*, product:products(id, name, code), sale:sales!inner(id, date)')
+        .gte('sales.date', dateRange.from)
+        .lte('sales.date', `${dateRange.to}T23:59:59`)
+        .range(0, 19999),
+      supabase
+        .from('purchase_items')
+        .select('*, product:products(id, name, code), purchase:purchases!inner(id, date)')
+        .gte('purchases.date', dateRange.from)
+        .lte('purchases.date', `${dateRange.to}T23:59:59`)
+        .range(0, 19999),
+      supabase
+        .from('product_adjustments')
+        .select('*, product:products(id, name, code), adjustment_batch:adjustment_batches!inner(id, adjusted_at)')
+        .gte('adjustment_batches.adjusted_at', `${dateRange.from}T00:00:00`)
+        .lte('adjustment_batches.adjusted_at', `${dateRange.to}T23:59:59`)
+        .range(0, 19999),
+      supabase.rpc('product_sales_report_by_items', {
+        start_date: dateRange.from,
+        end_date: dateRange.to,
+      }),
+      supabase.rpc('product_purchase_report_by_items', {
+        start_date: dateRange.from,
+        end_date: dateRange.to,
+      }),
     ])
       .then(([
         salesRes,
@@ -62,6 +107,8 @@ const Reports = () => {
         saleItemsRes,
         purchaseItemsRes,
         adjustmentsRes,
+        productSalesReportRes,
+        productPurchaseReportRes,
       ]) => {
         if (salesRes.error) throw salesRes.error;
         if (purchasesRes.error) throw purchasesRes.error;
@@ -74,6 +121,8 @@ const Reports = () => {
         if (saleItemsRes.error) throw saleItemsRes.error;
         if (purchaseItemsRes.error) throw purchaseItemsRes.error;
         if (adjustmentsRes.error) throw adjustmentsRes.error;
+        if (productSalesReportRes.error) throw productSalesReportRes.error;
+        if (productPurchaseReportRes.error) throw productPurchaseReportRes.error;
         setSales(salesRes.data || []);
         setPurchases(purchasesRes.data || []);
         setExpenses(expensesRes.data || []);
@@ -85,10 +134,22 @@ const Reports = () => {
         setSaleItems(saleItemsRes.data || []);
         setPurchaseItems(purchaseItemsRes.data || []);
         setAdjustments(adjustmentsRes.data || []);
+        const normalizedSalesReport = (productSalesReportRes.data || []).map((row: any) => ({
+          ...row,
+          total_qty: Number(row.total_qty) || 0,
+          total_amount: Number(row.total_amount) || 0,
+        }));
+        const normalizedPurchaseReport = (productPurchaseReportRes.data || []).map((row: any) => ({
+          ...row,
+          total_qty: Number(row.total_qty) || 0,
+          total_amount: Number(row.total_amount) || 0,
+        }));
+        setProductSalesReportData(normalizedSalesReport);
+        setProductPurchaseReportData(normalizedPurchaseReport);
       })
       .catch((err) => setError(err.message || 'Failed to load data'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [dateRange]);
 
   // Filter by date range
   const filterByDate = (arr: any[], dateKey: string) => {
@@ -202,97 +263,11 @@ const Reports = () => {
     return [...customers].sort((a, b) => new Date(b.created_at || b.id).getTime() - new Date(a.created_at || a.id).getTime()).slice(0, 10);
   }, [customers]);
 
-  // Section: Product Sales Report (by items)
-  const productSalesReport = useMemo(() => {
-    // Filter sale items by date range
-    const filteredItems = saleItems.filter((item) => {
-      if (!dateRange.from || !dateRange.to || !item.sale?.date) return true;
-      const from = new Date(dateRange.from);
-      const to = new Date(dateRange.to);
-      to.setHours(23, 59, 59, 999);
-      const d = new Date(item.sale.date);
-      return d >= from && d <= to;
-    });
+  const totalProductSales = productSalesReportData.reduce((sum, item) => sum + item.total_amount, 0);
+  const totalProductSalesQty = productSalesReportData.reduce((sum, item) => sum + item.total_qty, 0);
 
-    // Group by product and aggregate
-    const groupedMap = new Map<string, { product_id: string; product_code: string; product_name: string; total_qty: number; total_amount: number }>();
-    
-    filteredItems.forEach((item) => {
-      const productId = item.product_id;
-      const productName = item.product?.name || 'Unknown Product';
-      const productCode = item.product?.code || '';
-      const qty = Number(item.qty) || 0;
-      const price = Number(item.price) || 0;
-      const discount = Number(item.discount) || 0;
-      const tax = Number(item.tax) || 0;
-      const amount = (price * qty) - discount + tax;
-
-      if (groupedMap.has(productId)) {
-        const existing = groupedMap.get(productId)!;
-        existing.total_qty += qty;
-        existing.total_amount += amount;
-      } else {
-        groupedMap.set(productId, {
-          product_id: productId,
-          product_code: productCode,
-          product_name: productName,
-          total_qty: qty,
-          total_amount: amount,
-        });
-      }
-    });
-
-    return Array.from(groupedMap.values()).sort((a, b) => b.total_amount - a.total_amount);
-  }, [saleItems, dateRange]);
-
-  const totalProductSales = productSalesReport.reduce((sum, item) => sum + item.total_amount, 0);
-  const totalProductSalesQty = productSalesReport.reduce((sum, item) => sum + item.total_qty, 0);
-
-  // Section: Product Purchase Report (by items)
-  const productPurchaseReport = useMemo(() => {
-    // Filter purchase items by date range
-    const filteredItems = purchaseItems.filter((item) => {
-      if (!dateRange.from || !dateRange.to || !item.purchase?.date) return true;
-      const from = new Date(dateRange.from);
-      const to = new Date(dateRange.to);
-      to.setHours(23, 59, 59, 999);
-      const d = new Date(item.purchase.date);
-      return d >= from && d <= to;
-    });
-
-    // Group by product and aggregate
-    const groupedMap = new Map<string, { product_id: string; product_code: string; product_name: string; total_qty: number; total_amount: number }>();
-    
-    filteredItems.forEach((item) => {
-      const productId = item.product_id;
-      const productName = item.product?.name || item.product_name || 'Unknown Product';
-      const productCode = item.product?.code || item.product_code || '';
-      const qty = Number(item.qty) || 0;
-      const cost = Number(item.cost) || 0;
-      const discount = Number(item.discount) || 0;
-      const tax = Number(item.tax) || 0;
-      const amount = (cost * qty) - discount + tax;
-
-      if (groupedMap.has(productId)) {
-        const existing = groupedMap.get(productId)!;
-        existing.total_qty += qty;
-        existing.total_amount += amount;
-      } else {
-        groupedMap.set(productId, {
-          product_id: productId,
-          product_code: productCode,
-          product_name: productName,
-          total_qty: qty,
-          total_amount: amount,
-        });
-      }
-    });
-
-    return Array.from(groupedMap.values()).sort((a, b) => b.total_amount - a.total_amount);
-  }, [purchaseItems, dateRange]);
-
-  const totalProductPurchases = productPurchaseReport.reduce((sum, item) => sum + item.total_amount, 0);
-  const totalProductPurchasesQty = productPurchaseReport.reduce((sum, item) => sum + item.total_qty, 0);
+  const totalProductPurchases = productPurchaseReportData.reduce((sum, item) => sum + item.total_amount, 0);
+  const totalProductPurchasesQty = productPurchaseReportData.reduce((sum, item) => sum + item.total_qty, 0);
 
   // Section: Monthly Inventory Balance Report with Variance Analysis
   const monthlyInventoryBalance = useMemo(() => {
@@ -816,7 +791,7 @@ const Reports = () => {
           <section>
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaBoxes /> Product Sales Report (By Items)</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-              <ReportSummaryCard label="Total Products Sold" value={productSalesReport.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
+              <ReportSummaryCard label="Total Products Sold" value={productSalesReportData.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
               <ReportSummaryCard label="Total Quantity Sold" value={totalProductSalesQty.toString()} icon={<FaBoxes className="text-green-500" />} />
               <ReportSummaryCard label="Total Sales Amount" value={formatCurrency(totalProductSales)} icon={<FaChartBar className="text-purple-500" />} />
             </div>
@@ -831,9 +806,9 @@ const Reports = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {productSalesReport.length === 0 ? (
+                  {productSalesReportData.length === 0 ? (
                     <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No product sales found</td></tr>
-                  ) : productSalesReport.map((item) => (
+                  ) : productSalesReportData.map((item) => (
                     <tr key={item.product_id} className="border-b hover:bg-gray-50">
                       <td className="p-4">{item.product_code}</td>
                       <td className="p-4">{item.product_name}</td>
@@ -842,7 +817,7 @@ const Reports = () => {
                     </tr>
                   ))}
                 </tbody>
-                {productSalesReport.length > 0 && (
+                {productSalesReportData.length > 0 && (
                   <tfoot className="bg-gray-50 font-bold">
                     <tr className="border-t-2">
                       <td className="p-4" colSpan={2}>TOTAL</td>
@@ -853,7 +828,7 @@ const Reports = () => {
                 )}
               </table>
             </div>
-            <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productSalesReport, 'product_sales_report.csv')}>
+            <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productSalesReportData, 'product_sales_report.csv')}>
               <FaFileCsv /> Export Product Sales Report
             </button>
           </section>
@@ -863,7 +838,7 @@ const Reports = () => {
         <section>
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><FaBoxes /> Product Purchase Report (By Items)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            <ReportSummaryCard label="Total Products Purchased" value={productPurchaseReport.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
+            <ReportSummaryCard label="Total Products Purchased" value={productPurchaseReportData.length.toString()} icon={<FaBoxes className="text-blue-500" />} />
             <ReportSummaryCard label="Total Quantity Purchased" value={totalProductPurchasesQty.toString()} icon={<FaBoxes className="text-green-500" />} />
             <ReportSummaryCard label="Total Purchase Amount" value={formatCurrency(totalProductPurchases)} icon={<FaChartBar className="text-orange-500" />} />
           </div>
@@ -878,9 +853,9 @@ const Reports = () => {
                 </tr>
               </thead>
               <tbody>
-                {productPurchaseReport.length === 0 ? (
+                {productPurchaseReportData.length === 0 ? (
                   <tr><td className="p-6 text-center text-gray-400" colSpan={4}>No product purchases found</td></tr>
-                ) : productPurchaseReport.map((item) => (
+                ) : productPurchaseReportData.map((item) => (
                   <tr key={item.product_id} className="border-b hover:bg-gray-50">
                     <td className="p-4">{item.product_code}</td>
                     <td className="p-4">{item.product_name}</td>
@@ -889,7 +864,7 @@ const Reports = () => {
                   </tr>
                 ))}
               </tbody>
-              {productPurchaseReport.length > 0 && (
+              {productPurchaseReportData.length > 0 && (
                 <tfoot className="bg-gray-50 font-bold">
                   <tr className="border-t-2">
                     <td className="p-4" colSpan={2}>TOTAL</td>
@@ -900,7 +875,7 @@ const Reports = () => {
               )}
             </table>
           </div>
-          <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productPurchaseReport, 'product_purchase_report.csv')}>
+          <button className="border border-gray-300 text-gray-700 bg-white rounded-lg px-4 py-2 font-semibold hover:bg-gray-100 transition flex items-center gap-2" onClick={() => handleExportCSV(productPurchaseReportData, 'product_purchase_report.csv')}>
             <FaFileCsv /> Export Product Purchase Report
           </button>
         </section>
