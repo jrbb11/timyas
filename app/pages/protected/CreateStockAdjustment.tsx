@@ -235,39 +235,20 @@ const CreateStockAdjustment = () => {
     setError(null);
     setSuccess(null);
     try {
-      // Resolve current user -> people.id for adjusted_by
-      let adjustedByPersonId: string | null = null;
+      // Resolve current user -> app_users.id for adjusted_by
+      let adjustedByAppUserId: string | null = null;
       try {
         const { data: auth } = await supabase.auth.getUser();
         const userId = auth?.user?.id;
         if (userId) {
-          // Try to resolve a linked person row
-          let { data: person } = await supabase
-            .from('people')
+          // Get the app_users.id directly
+          const { data: appUser } = await supabase
+            .from('app_users')
             .select('id')
             .eq('user_id', userId)
             .limit(1)
             .single();
-          if (!person) {
-            // Create a minimal people row linked to this user
-            const { data: appUser } = await supabase
-              .from('app_users')
-              .select('first_name, last_name, email')
-              .eq('user_id', userId)
-              .limit(1)
-              .single();
-            const fullName = [appUser?.first_name, appUser?.last_name]
-              .filter(Boolean)
-              .join(' ');
-            const name = fullName || appUser?.email || 'User';
-            const { data: created } = await supabase
-              .from('people')
-              .insert([{ user_id: userId, name, type: 'user' }])
-              .select('id')
-              .single();
-            person = created || null;
-          }
-          adjustedByPersonId = person?.id || null;
+          adjustedByAppUserId = appUser?.id || null;
         }
       } catch (_) {
         // ignore – fallback to null shows as "System"
@@ -281,7 +262,7 @@ const CreateStockAdjustment = () => {
           notes,
           warehouse: selectedWarehouse,
           adjusted_at: date,
-          adjusted_by: adjustedByPersonId,
+          adjusted_by: adjustedByAppUserId,
         };
         const { data: batchRes, error: batchError } = await adjustmentBatchesService.create(batchData);
         if (batchError || !batchRes || !(batchRes as any[])[0]?.id) {
@@ -298,7 +279,7 @@ const CreateStockAdjustment = () => {
           notes,
           warehouse: selectedWarehouse,
           adjusted_at: date,
-          adjusted_by: adjustedByPersonId,
+          adjusted_by: adjustedByAppUserId,
         };
         await adjustmentBatchesService.update(id as string, batchData);
       }
@@ -330,7 +311,7 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: subItem.before_stock,
             after_stock: subItem.after_stock,
-            adjusted_by: adjustedByPersonId,
+            adjusted_by: adjustedByAppUserId,
             // No pricing for Production/Marination
           },
           {
@@ -340,7 +321,7 @@ const CreateStockAdjustment = () => {
             quantity: subItem.quantity,
             before_stock: currentStocks[marinatedChicken.id] || 0,
             after_stock: (currentStocks[marinatedChicken.id] || 0) + subItem.quantity,
-            adjusted_by: adjustedByPersonId,
+            adjusted_by: adjustedByAppUserId,
             // No pricing for Production/Marination
           },
         ];
@@ -373,7 +354,7 @@ const CreateStockAdjustment = () => {
           quantity: item.quantity,
           before_stock: item.before_stock,
           after_stock: item.after_stock,
-          adjusted_by: adjustedByPersonId,
+          adjusted_by: adjustedByAppUserId,
           unit_cost: item.unit_cost || 0,
           total_cost: item.total_cost || 0,
         }));

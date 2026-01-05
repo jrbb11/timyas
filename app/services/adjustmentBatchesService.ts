@@ -6,7 +6,7 @@ export const adjustmentBatchesService = {
       .from('adjustment_batches')
       .select(`
         *,
-        adjusted_by:people(name),
+        adjusted_by:app_users(first_name, last_name, email),
         warehouse:warehouses(name)
       `)
       .order('adjusted_at', { ascending: false });
@@ -16,7 +16,7 @@ export const adjustmentBatchesService = {
       .from('adjustment_batches')
       .select(`
         *,
-        adjusted_by:people(name),
+        adjusted_by:app_users(first_name, last_name, email),
         warehouse:warehouses(name)
       `)
       .eq('id', id)

@@ -172,7 +172,7 @@ const AllStockAdjustments = () => {
                     <td className="p-4 text-gray-500 max-w-xs truncate" title={adjustment.notes || ''}>
                       {adjustment.notes || 'No notes'}
                     </td>
-                    <td className="p-4">{adjustment.adjusted_by?.name || 'System'}</td>
+                    <td className="p-4">{adjustment.adjusted_by ? `${adjustment.adjusted_by.first_name || ''} ${adjustment.adjusted_by.last_name || ''}`.trim() || adjustment.adjusted_by.email : 'System'}</td>
                     <td className="p-4 text-center">
                       <div className="flex gap-1 justify-center">
                         <button onClick={() => handleView(adjustment)} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="View"><FaEye size={14} /></button>

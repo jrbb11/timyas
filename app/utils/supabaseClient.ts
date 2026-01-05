@@ -11,6 +11,20 @@ export async function getCurrentUser() {
   return data.user;
 }
 
+export async function getCurrentAppUserId() {
+  const user = await getCurrentUser();
+  if (!user) return null;
+  
+  const { data, error } = await supabase
+    .from('app_users')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+  
+  if (error || !data) return null;
+  return data.id;
+}
+
 export async function getAppUser(userId: string) {
   return await supabase
     .from('app_users')

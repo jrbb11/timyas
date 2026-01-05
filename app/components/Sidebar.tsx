@@ -48,6 +48,13 @@ const menu = [
       },
       { label: 'Discounts', icon: <FaTags />, path: '#', permission: { resource: 'sales', action: 'read' } },
       { label: 'Franchisee', icon: <FaUsers />, path: '/customers', permission: { resource: 'users', action: 'read' } },
+      {
+        label: 'Franchisee Invoices', icon: <FaFileInvoice />, permission: { resource: 'financial', action: 'read' },
+        children: [
+          { label: 'All Invoices', path: '/franchisee-invoices', permission: { resource: 'financial', action: 'read' } },
+          { label: 'Generate Invoice', path: '/franchisee-invoices/generate', permission: { resource: 'financial', action: 'create' } },
+        ]
+      },
       { label: 'Reports', icon: <FaChartBar />, path: '/reports', permission: { resource: 'reports', action: 'read' } },
     ]
   },
