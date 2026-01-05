@@ -116,12 +116,20 @@ const FranchiseeInvoiceGenerate = () => {
     try {
       const appUserId = await getCurrentAppUserId();
       
+      console.log('Current app_user_id:', appUserId);
+      
+      if (!appUserId) {
+        throw new Error('User not found in app_users table. Please contact administrator to create your app_users record.');
+      }
+      
+      console.log('Generating invoice with created_by:', appUserId);
+      
       const { data, error: genError } = await franchiseeInvoicesService.generateInvoice({
         people_branches_id: selectedPeopleBranches,
         period_start: periodStart,
         period_end: periodEnd,
         due_days: dueDays,
-        created_by: appUserId || undefined,
+        created_by: appUserId,
         notes: notes || undefined
       });
 

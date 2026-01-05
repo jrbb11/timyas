@@ -287,7 +287,10 @@ CREATE OR REPLACE FUNCTION generate_franchisee_invoice(
     p_created_by UUID DEFAULT NULL,
     p_notes TEXT DEFAULT NULL
 )
-RETURNS UUID AS $$
+RETURNS UUID
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_invoice_id UUID;
     v_franchisee_id UUID;
@@ -338,7 +341,7 @@ BEGIN
         SELECT 
             s.id as sale_id,
             s.reference,
-            s.date,
+            s.date as sale_date,
             s.total_amount,
             s.discount,
             s.order_tax,
