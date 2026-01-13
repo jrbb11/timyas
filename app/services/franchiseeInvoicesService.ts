@@ -39,6 +39,7 @@ export interface FranchiseeInvoiceItem {
   unit_price: number;
   discount: number;
   tax: number;
+  shipping: number;
   line_total: number;
   created_at: string;
 }

@@ -16,17 +16,19 @@ const FranchiseeInvoicesList = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Filters
   const [selectedFranchisee, setSelectedFranchisee] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
   const [selectedPaymentStatus, setSelectedPaymentStatus] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [franchisees, setFranchisees] = useState<FranchiseeOption[]>([]);
 
   useEffect(() => {
     loadFranchisees();
     loadInvoices();
-  }, [selectedFranchisee, selectedStatus, selectedPaymentStatus]);
+  }, [selectedFranchisee, selectedStatus, selectedPaymentStatus, fromDate, toDate]);
 
   const loadFranchisees = async () => {
     const { data, error } = await supabase
@@ -35,7 +37,7 @@ const FranchiseeInvoicesList = () => {
         id,
         person:people!people_branches_person_id_fkey(id, name)
       `);
-    
+
     if (data) {
       const options = data.map((pb: any) => ({
         id: pb.person.id,
@@ -54,9 +56,11 @@ const FranchiseeInvoicesList = () => {
     if (selectedFranchisee) filters.franchisee_id = selectedFranchisee;
     if (selectedStatus) filters.status = selectedStatus;
     if (selectedPaymentStatus) filters.payment_status = selectedPaymentStatus;
+    if (fromDate) filters.from_date = fromDate;
+    if (toDate) filters.to_date = toDate;
 
     const { data, error: err } = await franchiseeInvoicesService.getAll(filters);
-    
+
     if (err) {
       setError(err.message);
     } else {
@@ -109,8 +113,8 @@ const FranchiseeInvoicesList = () => {
   };
 
   return (
-    <AdminLayout 
-      title="Franchisee Invoices" 
+    <AdminLayout
+      title="Franchisee Invoices"
       breadcrumb={<span>Invoicing &gt; <span className="text-gray-900">Franchisee Invoices</span></span>}
     >
       <div className="p-6">
@@ -127,7 +131,7 @@ const FranchiseeInvoicesList = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Franchisee
@@ -178,6 +182,30 @@ const FranchiseeInvoicesList = () => {
                 <option value="paid">Paid</option>
                 <option value="overdue">Overdue</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                From Date
+              </label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                To Date
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg p-2"
+              />
             </div>
           </div>
         </div>
@@ -237,7 +265,7 @@ const FranchiseeInvoicesList = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoices.map((invoice) => (
                     <tr key={invoice.id} className="hover:bg-gray-50 cursor-pointer">
-                      <td 
+                      <td
                         className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600"
                         onClick={() => navigate(`/franchisee-invoices/${invoice.id}`)}
                       >

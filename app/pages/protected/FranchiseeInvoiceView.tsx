@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import { franchiseeInvoicesService } from '../../services/franchiseeInvoicesService';
-import { getCurrentUser } from '../../utils/supabaseClient';
+import { getCurrentUser, supabase } from '../../utils/supabaseClient';
 
 const FranchiseeInvoiceView = () => {
   const { id } = useParams<{ id: string }>();
@@ -10,17 +10,27 @@ const FranchiseeInvoiceView = () => {
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Payment modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState('');
+  const [referenceNumber, setReferenceNumber] = useState('');
   const [paymentNotes, setPaymentNotes] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
   useEffect(() => {
     if (id) loadInvoice();
+    loadPaymentMethods();
   }, [id]);
+
+  const loadPaymentMethods = async () => {
+    const { data } = await supabase.from('payment_methods').select('*');
+    if (data) setPaymentMethods(data);
+  };
 
   const loadInvoice = async () => {
     if (!id) return;
@@ -28,7 +38,7 @@ const FranchiseeInvoiceView = () => {
     setError(null);
 
     const { data, error: err } = await franchiseeInvoicesService.getById(id);
-    
+
     if (err) {
       setError(err.message);
     } else {
@@ -39,10 +49,10 @@ const FranchiseeInvoiceView = () => {
 
   const handleStatusChange = async (newStatus: string) => {
     if (!id) return;
-    
+
     const user = await getCurrentUser();
     const { error: err } = await franchiseeInvoicesService.updateStatus(id, newStatus as any, user?.id);
-    
+
     if (err) {
       alert('Error updating status: ' + err.message);
     } else {
@@ -52,27 +62,58 @@ const FranchiseeInvoiceView = () => {
 
   const handleAddPayment = async () => {
     if (!id || !paymentAmount) return;
-    
+
     setPaymentLoading(true);
-    const user = await getCurrentUser();
-    
-    const { error: err } = await franchiseeInvoicesService.addPayment({
-      invoice_id: id,
-      amount: parseFloat(paymentAmount),
-      payment_date: paymentDate,
-      notes: paymentNotes || undefined,
-      account_id: 1, // Default account - should be selectable
-      created_by: user?.id
-    });
-    
-    if (err) {
-      alert('Error recording payment: ' + err.message);
-    } else {
-      setShowPaymentModal(false);
-      setPaymentAmount('');
-      setPaymentNotes('');
-      loadInvoice();
+    let receiptUrl = null;
+
+    try {
+      // Upload receipt if file is selected
+      if (receiptFile) {
+        const fileExt = receiptFile.name.split('.').pop();
+        const fileName = `${id}_${Date.now()}.${fileExt}`;
+        const filePath = `franchisee-receipts/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(filePath, receiptFile);
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from('receipts')
+          .getPublicUrl(filePath);
+
+        receiptUrl = urlData.publicUrl;
+      }
+
+      // Record payment
+      const { error: err } = await franchiseeInvoicesService.addPayment({
+        invoice_id: id,
+        amount: parseFloat(paymentAmount),
+        payment_date: paymentDate,
+        payment_method_id: paymentMethod ? parseInt(paymentMethod) : undefined,
+        reference_number: referenceNumber || undefined,
+        notes: paymentNotes || undefined,
+        receipt_url: receiptUrl || undefined,
+        account_id: 1 // Default account - should be selectable
+      });
+
+      if (err) {
+        alert('Error recording payment: ' + err.message);
+      } else {
+        setShowPaymentModal(false);
+        setPaymentAmount('');
+        setPaymentMethod('');
+        setReferenceNumber('');
+        setPaymentNotes('');
+        setReceiptFile(null);
+        loadInvoice();
+      }
+    } catch (error: any) {
+      alert('Error: ' + error.message);
     }
+
     setPaymentLoading(false);
   };
 
@@ -136,7 +177,7 @@ const FranchiseeInvoiceView = () => {
   }
 
   return (
-    <AdminLayout 
+    <AdminLayout
       title={`Invoice ${invoice.invoice_number}`}
       breadcrumb={
         <span>
@@ -167,13 +208,13 @@ const FranchiseeInvoiceView = () => {
             </button>
             {invoice.status === 'draft' && (
               <>
-                <button 
+                <button
                   onClick={() => handleStatusChange('sent')}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
                 >
                   Mark as Sent
                 </button>
-                <button 
+                <button
                   onClick={() => handleStatusChange('approved')}
                   className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
                 >
@@ -253,7 +294,7 @@ const FranchiseeInvoiceView = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Description
+                      Invoice #
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Sale Date
@@ -265,10 +306,16 @@ const FranchiseeInvoiceView = () => {
                       Unit Price
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      Shipping
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Discount
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Tax
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Breakdown
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Total
@@ -278,17 +325,31 @@ const FranchiseeInvoiceView = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {invoice.items?.map((item: any) => (
                     <tr key={item.id}>
-                      <td className="px-4 py-3 text-sm text-gray-900">{item.description}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        <div className="font-medium">{item.sale_reference}</div>
+                        <div className="text-xs text-gray-500">{item.description}</div>
+                      </td>
                       <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.sale_date)}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">{item.quantity}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {formatCurrency(item.unit_price)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-blue-600">
+                        {formatCurrency(item.shipping || 0)}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-red-600">
                         {formatCurrency(item.discount)}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {formatCurrency(item.tax)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        <div className="font-mono text-xs">
+                          {item.quantity} × {formatCurrency(item.unit_price)}
+                          {item.shipping > 0 && ` + ${formatCurrency(item.shipping)}`}
+                          {item.discount > 0 && ` - ${formatCurrency(item.discount)}`}
+                          {item.tax > 0 && ` + ${formatCurrency(item.tax)}`}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
                         {formatCurrency(item.line_total)}
@@ -364,6 +425,9 @@ const FranchiseeInvoiceView = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Notes
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Receipt
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -384,6 +448,20 @@ const FranchiseeInvoiceView = () => {
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {payment.notes || '-'}
                       </td>
+                      <td className="px-4 py-3 text-sm">
+                        {payment.receipt_url ? (
+                          <a
+                            href={payment.receipt_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            View Receipt
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -395,10 +473,10 @@ const FranchiseeInvoiceView = () => {
 
       {/* Payment Modal */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPaymentModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-gray-900 mb-4">Record Payment</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -428,6 +506,54 @@ const FranchiseeInvoiceView = () => {
                   onChange={(e) => setPaymentDate(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg p-2"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Method
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                >
+                  <option value="">Select payment method</option>
+                  {paymentMethods.map((method) => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reference Number
+                </label>
+                <input
+                  type="text"
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="e.g., Check #1234, Transaction ID"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Receipt Upload
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                />
+                {receiptFile && (
+                  <div className="text-xs text-green-600 mt-1">
+                    Selected: {receiptFile.name}
+                  </div>
+                )}
               </div>
 
               <div>
