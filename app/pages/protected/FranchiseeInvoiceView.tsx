@@ -22,6 +22,10 @@ const FranchiseeInvoiceView = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
 
+  // Edit Invoice Date
+  const [isEditingDate, setIsEditingDate] = useState(false);
+  const [newInvoiceDate, setNewInvoiceDate] = useState('');
+
   useEffect(() => {
     if (id) loadInvoice();
     loadPaymentMethods();
@@ -43,8 +47,26 @@ const FranchiseeInvoiceView = () => {
       setError(err.message);
     } else {
       setInvoice(data);
+      if (data?.invoice_date) {
+        setNewInvoiceDate(data.invoice_date);
+      }
     }
     setLoading(false);
+  };
+
+  const handleUpdateDate = async () => {
+    if (!id || !newInvoiceDate) return;
+
+    const { error: err } = await franchiseeInvoicesService.update(id, {
+      invoice_date: newInvoiceDate
+    });
+
+    if (err) {
+      alert('Error updating invoice date: ' + err.message);
+    } else {
+      setIsEditingDate(false);
+      loadInvoice();
+    }
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -234,7 +256,48 @@ const FranchiseeInvoiceView = () => {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">INVOICE</h1>
                 <div className="text-gray-600">
                   <div className="font-medium text-lg">{invoice.invoice_number}</div>
-                  <div className="text-sm">Invoice Date: {formatDate(invoice.invoice_date)}</div>
+
+                  <div className="text-sm flex items-center gap-2">
+                    <span>Invoice Date:</span>
+                    {isEditingDate ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="date"
+                          value={newInvoiceDate}
+                          onChange={(e) => setNewInvoiceDate(e.target.value)}
+                          className="border rounded px-1 py-0.5 text-xs"
+                        />
+                        <button
+                          onClick={handleUpdateDate}
+                          className="bg-green-600 text-white px-2 py-0.5 rounded text-xs hover:bg-green-700"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsEditingDate(false);
+                            setNewInvoiceDate(invoice.invoice_date);
+                          }}
+                          className="bg-gray-300 text-gray-800 px-2 py-0.5 rounded text-xs hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span>{formatDate(invoice.invoice_date)}</span>
+                        {invoice.status !== 'cancelled' && invoice.payment_status !== 'paid' && (
+                          <button
+                            onClick={() => setIsEditingDate(true)}
+                            className="text-blue-600 hover:text-blue-800 text-xs underline"
+                            title="Edit Invoice Date"
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="text-sm">Due Date: {formatDate(invoice.due_date)}</div>
                 </div>
               </div>
@@ -308,12 +371,12 @@ const FranchiseeInvoiceView = () => {
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Shipping
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    {/* <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Discount
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       Tax
-                    </th>
+                    </th> */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Breakdown
                     </th>
@@ -335,14 +398,14 @@ const FranchiseeInvoiceView = () => {
                         {formatCurrency(item.unit_price)}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">
-                        {formatCurrency(item.shipping || 0)}
+                        {item.shipping > 0 ? formatCurrency(item.shipping || 0) : '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-red-600">
+                      {/* <td className="px-4 py-3 text-sm text-right text-red-600">
                         {formatCurrency(item.discount)}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-900">
                         {formatCurrency(item.tax)}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3 text-sm text-gray-700">
                         <div className="font-mono text-xs">
                           {item.quantity} × {formatCurrency(item.unit_price)}

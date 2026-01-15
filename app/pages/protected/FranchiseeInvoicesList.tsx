@@ -302,14 +302,6 @@ const FranchiseeInvoicesList = () => {
                         >
                           View
                         </button>
-                        {invoice.status === 'draft' && (
-                          <button
-                            onClick={() => navigate(`/franchisee-invoices/${invoice.id}/edit`)}
-                            className="text-gray-600 hover:text-gray-900"
-                          >
-                            Edit
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))}
