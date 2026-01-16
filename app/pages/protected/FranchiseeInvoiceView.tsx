@@ -3,6 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import { franchiseeInvoicesService } from '../../services/franchiseeInvoicesService';
 import { getCurrentUser, supabase } from '../../utils/supabaseClient';
+import { CreditBalanceCard } from '../../components/franchisee/CreditBalanceCard';
+import { CreditHistoryModal } from '../../components/franchisee/CreditHistoryModal';
+import { PaymentAdjustmentModal } from '../../components/franchisee/PaymentAdjustmentModal';
+import { OverpaymentConfirmation } from '../../components/franchisee/OverpaymentConfirmation';
+import { franchiseeCreditsService } from '../../services/franchiseeCreditsService';
 
 const FranchiseeInvoiceView = () => {
   const { id } = useParams<{ id: string }>();
@@ -25,6 +30,20 @@ const FranchiseeInvoiceView = () => {
   // Edit Invoice Date
   const [isEditingDate, setIsEditingDate] = useState(false);
   const [newInvoiceDate, setNewInvoiceDate] = useState('');
+
+  // Credit history modal
+  const [showCreditHistory, setShowCreditHistory] = useState(false);
+
+  // Payment adjustment modal
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+
+  // Overpayment confirmation
+  const [showOverpaymentConfirmation, setShowOverpaymentConfirmation] = useState(false);
+  const [overpaymentData, setOverpaymentData] = useState({
+    invoiceAmount: 0,
+    paymentAmount: 0,
+  });
 
   useEffect(() => {
     if (id) loadInvoice();
@@ -96,6 +115,41 @@ const FranchiseeInvoiceView = () => {
   const handleAddPayment = async () => {
     if (!id || !paymentAmount) return;
 
+    const invoiceBalance = invoice.balance;
+    const paymentAmountNum = parseFloat(paymentAmount);
+
+    // Check for overpayment
+    if (paymentAmountNum > invoiceBalance) {
+      setOverpaymentData({
+        invoiceAmount: invoiceBalance,
+        paymentAmount: paymentAmountNum,
+      });
+      setShowOverpaymentConfirmation(true);
+      return;
+    }
+
+    // Continue with normal payment processing
+    await processPayment();
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    if (!window.confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) return;
+
+    setLoading(true);
+    const { error: err } = await franchiseeInvoicesService.delete(id);
+
+    if (err) {
+      alert('Error deleting invoice: ' + err.message);
+      setLoading(false);
+    } else {
+      navigate('/franchisee-invoices');
+    }
+  };
+
+  const processPayment = async () => {
+    if (!id || !paymentAmount) return;
+
     setPaymentLoading(true);
     let receiptUrl = null;
 
@@ -120,10 +174,13 @@ const FranchiseeInvoiceView = () => {
         receiptUrl = urlData.publicUrl;
       }
 
+      const paymentAmountNum = parseFloat(paymentAmount);
+      const invoiceBalance = invoice.balance;
+
       // Record payment
       const { error: err } = await franchiseeInvoicesService.addPayment({
         invoice_id: id,
-        amount: parseFloat(paymentAmount),
+        amount: paymentAmountNum,
         payment_date: paymentDate,
         payment_method_id: paymentMethod ? parseInt(paymentMethod) : undefined,
         reference_number: referenceNumber || undefined,
@@ -134,20 +191,46 @@ const FranchiseeInvoiceView = () => {
 
       if (err) {
         alert('Error recording payment: ' + err.message);
-      } else {
-        setShowPaymentModal(false);
-        setPaymentAmount('');
-        setPaymentMethod('');
-        setReferenceNumber('');
-        setPaymentNotes('');
-        setReceiptFile(null);
-        loadInvoice();
+        return;
       }
+
+      // Create credit if overpayment
+      if (paymentAmountNum > invoiceBalance) {
+        const excessAmount = paymentAmountNum - invoiceBalance;
+
+        await franchiseeCreditsService.createCreditFromOverpayment({
+          franchisee_id: invoice.franchisee_id,
+          amount: excessAmount,
+          source_invoice_id: id,
+          notes: `Overpayment from invoice ${invoice.invoice_number}`,
+        });
+      }
+
+      // Reset form and close modals
+      setShowPaymentModal(false);
+      setShowOverpaymentConfirmation(false);
+      setPaymentAmount('');
+      setPaymentMethod('');
+      setReferenceNumber('');
+      setPaymentNotes('');
+      setReceiptFile(null);
+      loadInvoice();
     } catch (error: any) {
       alert('Error: ' + error.message);
     }
 
     setPaymentLoading(false);
+  };
+
+  const handleAdjustPayment = (payment: any) => {
+    setSelectedPayment(payment);
+    setShowAdjustmentModal(true);
+  };
+
+  const handleAdjustmentSuccess = () => {
+    setShowAdjustmentModal(false);
+    setSelectedPayment(null);
+    loadInvoice();
   };
 
   const formatCurrency = (amount: number | string) => {
@@ -239,6 +322,12 @@ const FranchiseeInvoiceView = () => {
             <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
               Export PDF
             </button>
+            <button
+              onClick={handleDelete}
+              className="border border-red-300 text-red-700 px-4 py-2 rounded-lg hover:bg-red-50 ml-2"
+            >
+              Delete
+            </button>
             {invoice.status === 'draft' && (
               <>
                 <button
@@ -318,6 +407,16 @@ const FranchiseeInvoiceView = () => {
               </div>
             </div>
           </div>
+
+          {/* Credit Balance Card */}
+          {invoice.franchisee_id && (
+            <div className="mb-8">
+              <CreditBalanceCard
+                franchiseeId={invoice.franchisee_id}
+                onViewHistory={() => setShowCreditHistory(true)}
+              />
+            </div>
+          )}
 
           {/* Parties Information */}
           <div className="grid grid-cols-2 gap-8 mb-8">
@@ -510,6 +609,9 @@ const FranchiseeInvoiceView = () => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Receipt
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -543,6 +645,14 @@ const FranchiseeInvoiceView = () => {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <button
+                          onClick={() => handleAdjustPayment(payment)}
+                          className="text-blue-600 hover:text-blue-800 underline text-sm"
+                        >
+                          Adjust
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -668,6 +778,43 @@ const FranchiseeInvoiceView = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Credit History Modal */}
+      {invoice && (
+        <CreditHistoryModal
+          franchiseeId={invoice.franchisee_id}
+          isOpen={showCreditHistory}
+          onClose={() => setShowCreditHistory(false)}
+        />
+      )}
+
+      {/* Payment Adjustment Modal */}
+      {selectedPayment && (
+        <PaymentAdjustmentModal
+          payment={selectedPayment}
+          isOpen={showAdjustmentModal}
+          onClose={() => {
+            setShowAdjustmentModal(false);
+            setSelectedPayment(null);
+          }}
+          onSuccess={handleAdjustmentSuccess}
+        />
+      )}
+
+      {/* Overpayment Confirmation Modal */}
+      {invoice && (
+        <OverpaymentConfirmation
+          invoiceAmount={overpaymentData.invoiceAmount}
+          paymentAmount={overpaymentData.paymentAmount}
+          invoiceNumber={invoice.invoice_number}
+          isOpen={showOverpaymentConfirmation}
+          onConfirm={processPayment}
+          onCancel={() => {
+            setShowOverpaymentConfirmation(false);
+            setOverpaymentData({ invoiceAmount: 0, paymentAmount: 0 });
+          }}
+        />
       )}
     </AdminLayout>
   );

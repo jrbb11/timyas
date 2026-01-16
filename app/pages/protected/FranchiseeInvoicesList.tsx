@@ -4,11 +4,14 @@ import AdminLayout from '../../layouts/AdminLayout';
 import { franchiseeInvoicesService } from '../../services/franchiseeInvoicesService';
 import { customersService } from '../../services/customersService';
 import { supabase } from '../../utils/supabaseClient';
+import { OpeningBalanceModal } from '../../components/franchisee/OpeningBalanceModal';
 
 type FranchiseeOption = {
   id: string;
   name: string;
   people_branches_id: string;
+  branch_id?: string;
+  branch_name?: string;
 };
 
 const FranchiseeInvoicesList = () => {
@@ -25,6 +28,16 @@ const FranchiseeInvoicesList = () => {
   const [toDate, setToDate] = useState('');
   const [franchisees, setFranchisees] = useState<FranchiseeOption[]>([]);
 
+  // Opening Balance Modal
+  const [showOpeningBalanceModal, setShowOpeningBalanceModal] = useState(false);
+  const [selectedFranchiseeForBalance, setSelectedFranchiseeForBalance] = useState<{
+    id: string;
+    name: string;
+    people_branches_id: string;
+    branch_id: string;
+    branch_name?: string;
+  } | null>(null);
+
   useEffect(() => {
     loadFranchisees();
     loadInvoices();
@@ -35,6 +48,8 @@ const FranchiseeInvoicesList = () => {
       .from('people_branches')
       .select(`
         id,
+        branch_id,
+        branch:branches!people_branches_branch_id_fkey(name),
         person:people!people_branches_person_id_fkey(id, name)
       `);
 
@@ -42,11 +57,15 @@ const FranchiseeInvoicesList = () => {
       const options = data.map((pb: any) => ({
         id: pb.person.id,
         name: pb.person.name,
-        people_branches_id: pb.id
+        people_branches_id: pb.id,
+        branch_id: pb.branch_id,
+        branch_name: pb.branch?.name
       }));
       setFranchisees(options);
     }
   };
+
+
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -121,12 +140,23 @@ const FranchiseeInvoicesList = () => {
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Franchisee Invoices</h1>
-          <button
-            onClick={() => navigate('/franchisee-invoices/generate')}
-            className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition"
-          >
-            + Generate Invoice
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setSelectedFranchiseeForBalance(null);
+                setShowOpeningBalanceModal(true);
+              }}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+            >
+              + Opening Balance
+            </button>
+            <button
+              onClick={() => navigate('/franchisee-invoices/generate')}
+              className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition"
+            >
+              + Generate Invoice
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -298,7 +328,7 @@ const FranchiseeInvoicesList = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => navigate(`/franchisee-invoices/${invoice.id}`)}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           View
                         </button>
@@ -339,6 +369,22 @@ const FranchiseeInvoicesList = () => {
           </div>
         )}
       </div>
+
+      {/* Opening Balance Modal */}
+      <OpeningBalanceModal
+        franchisee={selectedFranchiseeForBalance}
+        franchisees={franchisees}
+        isOpen={showOpeningBalanceModal}
+        onClose={() => {
+          setShowOpeningBalanceModal(false);
+          setSelectedFranchiseeForBalance(null);
+        }}
+        onSuccess={() => {
+          loadInvoices();
+          setShowOpeningBalanceModal(false);
+          setSelectedFranchiseeForBalance(null);
+        }}
+      />
     </AdminLayout>
   );
 };
