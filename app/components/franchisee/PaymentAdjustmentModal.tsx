@@ -2,259 +2,268 @@ import React, { useState } from 'react';
 import { franchiseeCreditsService } from '../../services/franchiseeCreditsService';
 
 interface PaymentAdjustmentModalProps {
-    payment: {
-        id: string;
-        amount: number;
-        payment_date: string;
-        reference_number?: string;
-    };
-    isOpen: boolean;
-    onClose: () => void;
-    onSuccess: () => void;
+  payment: {
+    id: string;
+    amount: number;
+    payment_date: string;
+    reference_number?: string;
+  };
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
 }
 
 export const PaymentAdjustmentModal: React.FC<PaymentAdjustmentModalProps> = ({
-    payment,
-    isOpen,
-    onClose,
-    onSuccess,
+  payment,
+  isOpen,
+  onClose,
+  onSuccess,
 }) => {
-    const [adjustedAmount, setAdjustedAmount] = useState(payment.amount.toString());
-    const [reason, setReason] = useState('');
-    const [adjustmentType, setAdjustmentType] = useState<'correction' | 'reversal'>('correction');
-    const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<string[]>([]);
-    const [showConfirmation, setShowConfirmation] = useState(false);
+  const [adjustedAmount, setAdjustedAmount] = useState(payment.amount.toString());
+  const [reason, setReason] = useState('');
+  const [adjustmentType, setAdjustmentType] = useState<'correction' | 'reversal'>('correction');
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-    const difference = parseFloat(adjustedAmount) - payment.amount;
+  const difference = parseFloat(adjustedAmount) - payment.amount;
 
-    const handleValidateAndConfirm = () => {
-        const validation = franchiseeCreditsService.validateAdjustment({
-            original_amount: payment.amount,
-            adjusted_amount: parseFloat(adjustedAmount),
-            reason,
-        });
+  const handleValidateAndConfirm = () => {
+    const validation = franchiseeCreditsService.validateAdjustment({
+      original_amount: payment.amount,
+      adjusted_amount: parseFloat(adjustedAmount),
+      reason,
+    });
 
-        if (!validation.valid) {
-            setErrors(validation.errors);
-            return;
-        }
+    if (!validation.valid) {
+      setErrors(validation.errors);
+      return;
+    }
 
-        setErrors([]);
-        setShowConfirmation(true);
-    };
+    setErrors([]);
+    setShowConfirmation(true);
+  };
 
-    const handleSubmit = async () => {
-        setLoading(true);
+  const handleSubmit = async () => {
+    setLoading(true);
 
-        try {
-            // Get current user ID (you'll need to get this from your auth context)
-            const { data: { user } } = await import('../../utils/supabaseClient').then(m => m.supabase.auth.getUser());
+    try {
+      // Get current user ID (you'll need to get this from your auth context)
+      const { data: { user } } = await import('../../utils/supabaseClient').then(m => m.supabase.auth.getUser());
 
-            if (!user) {
-                throw new Error('User not authenticated');
-            }
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
-            const { error } = await franchiseeCreditsService.createPaymentAdjustment({
-                payment_id: payment.id,
-                adjustment_type: adjustmentType,
-                original_amount: payment.amount,
-                adjusted_amount: parseFloat(adjustedAmount),
-                reason,
-                adjusted_by: user.id,
-            });
+      const { error } = await franchiseeCreditsService.createPaymentAdjustment({
+        payment_id: payment.id,
+        adjustment_type: adjustmentType,
+        original_amount: payment.amount,
+        adjusted_amount: parseFloat(adjustedAmount),
+        reason,
+        adjusted_by: user.id,
+      });
 
-            if (error) {
-                throw error;
-            }
+      if (error) {
+        throw error;
+      }
 
-            onSuccess();
-            onClose();
-        } catch (error) {
-            console.error('Error creating adjustment:', error);
-            setErrors(['Failed to create adjustment. Please try again.']);
-        } finally {
-            setLoading(false);
-            setShowConfirmation(false);
-        }
-    };
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error creating adjustment:', error);
+      const errorMessage = (error as any).message || (error as any).details || 'Failed to create adjustment. Please try again.';
+      setErrors([`Error: ${errorMessage}`]);
+    } finally {
+      setLoading(false);
+      setShowConfirmation(false);
+    }
+  };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-        }).format(amount);
-    };
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
 
-    if (!isOpen) return null;
+  if (!isOpen) return null;
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>🔧 Adjust Payment</h2>
-                    <button className="close-button" onClick={onClose}>×</button>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>🔧 Adjust Payment</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          {!showConfirmation ? (
+            <>
+              <div className="payment-info">
+                <div className="info-row">
+                  <span>Payment Date:</span>
+                  <strong>{new Date(payment.payment_date).toLocaleDateString()}</strong>
                 </div>
-
-                <div className="modal-body">
-                    {!showConfirmation ? (
-                        <>
-                            <div className="payment-info">
-                                <div className="info-row">
-                                    <span>Payment Date:</span>
-                                    <strong>{new Date(payment.payment_date).toLocaleDateString()}</strong>
-                                </div>
-                                {payment.reference_number && (
-                                    <div className="info-row">
-                                        <span>Reference:</span>
-                                        <strong>{payment.reference_number}</strong>
-                                    </div>
-                                )}
-                                <div className="info-row highlight">
-                                    <span>Original Amount:</span>
-                                    <strong>{formatCurrency(payment.amount)}</strong>
-                                </div>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="adjustmentType">Adjustment Type</label>
-                                <select
-                                    id="adjustmentType"
-                                    value={adjustmentType}
-                                    onChange={(e) => setAdjustmentType(e.target.value as 'correction' | 'reversal')}
-                                    className="form-control"
-                                >
-                                    <option value="correction">Correction (Partial or Full)</option>
-                                    <option value="reversal">Full Reversal</option>
-                                </select>
-                            </div>
-
-                            <div className="form-group">
-                                <label htmlFor="adjustedAmount">Correct Amount</label>
-                                <input
-                                    id="adjustedAmount"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={adjustedAmount}
-                                    onChange={(e) => setAdjustedAmount(e.target.value)}
-                                    className="form-control"
-                                    disabled={adjustmentType === 'reversal'}
-                                />
-                                {adjustmentType === 'reversal' && (
-                                    <small className="form-hint">Reversal will set amount to ₱0.00</small>
-                                )}
-                            </div>
-
-                            {difference !== 0 && (
-                                <div className={`adjustment-summary ${difference > 0 ? 'increase' : 'decrease'}`}>
-                                    <span>Adjustment:</span>
-                                    <strong>
-                                        {difference > 0 ? '+' : ''}{formatCurrency(difference)}
-                                    </strong>
-                                </div>
-                            )}
-
-                            <div className="form-group">
-                                <label htmlFor="reason">
-                                    Reason for Adjustment <span className="required">*</span>
-                                </label>
-                                <textarea
-                                    id="reason"
-                                    value={reason}
-                                    onChange={(e) => setReason(e.target.value)}
-                                    className="form-control"
-                                    rows={4}
-                                    placeholder="Please provide a detailed explanation for this adjustment (minimum 10 characters)..."
-                                />
-                                <small className="char-count">{reason.length} characters</small>
-                            </div>
-
-                            {errors.length > 0 && (
-                                <div className="error-box">
-                                    <strong>⚠️ Please fix the following errors:</strong>
-                                    <ul>
-                                        {errors.map((error, index) => (
-                                            <li key={index}>{error}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="confirmation-box">
-                            <div className="confirmation-icon">⚠️</div>
-                            <h3>Confirm Payment Adjustment</h3>
-
-                            <div className="confirmation-details">
-                                <div className="detail-row">
-                                    <span>Original Amount:</span>
-                                    <strong>{formatCurrency(payment.amount)}</strong>
-                                </div>
-                                <div className="detail-row">
-                                    <span>Adjusted Amount:</span>
-                                    <strong className="highlight">{formatCurrency(parseFloat(adjustedAmount))}</strong>
-                                </div>
-                                <div className="detail-row">
-                                    <span>Difference:</span>
-                                    <strong className={difference > 0 ? 'increase' : 'decrease'}>
-                                        {difference > 0 ? '+' : ''}{formatCurrency(difference)}
-                                    </strong>
-                                </div>
-                            </div>
-
-                            <div className="warning-box">
-                                <p><strong>This action will:</strong></p>
-                                <ul>
-                                    <li>Update the payment record</li>
-                                    <li>Recalculate the invoice balance</li>
-                                    <li>Create an audit log entry</li>
-                                    <li>Record your user ID and timestamp</li>
-                                </ul>
-                                <p className="warning-text">
-                                    ⚠️ <strong>This action cannot be undone.</strong>
-                                </p>
-                            </div>
-                        </div>
-                    )}
+                {payment.reference_number && (
+                  <div className="info-row">
+                    <span>Reference:</span>
+                    <strong>{payment.reference_number}</strong>
+                  </div>
+                )}
+                <div className="info-row highlight">
+                  <span>Original Amount:</span>
+                  <strong>{formatCurrency(payment.amount)}</strong>
                 </div>
+              </div>
 
-                <div className="modal-footer">
-                    {!showConfirmation ? (
-                        <>
-                            <button className="btn-cancel" onClick={onClose} disabled={loading}>
-                                Cancel
-                            </button>
-                            <button
-                                className="btn-primary"
-                                onClick={handleValidateAndConfirm}
-                                disabled={loading}
-                            >
-                                Continue
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                className="btn-cancel"
-                                onClick={() => setShowConfirmation(false)}
-                                disabled={loading}
-                            >
-                                Back
-                            </button>
-                            <button
-                                className="btn-danger"
-                                onClick={handleSubmit}
-                                disabled={loading}
-                            >
-                                {loading ? 'Processing...' : 'Confirm Adjustment'}
-                            </button>
-                        </>
-                    )}
+              <div className="form-group">
+                <label htmlFor="adjustmentType">Adjustment Type</label>
+                <select
+                  id="adjustmentType"
+                  value={adjustmentType}
+                  onChange={(e) => {
+                    const type = e.target.value as 'correction' | 'reversal';
+                    setAdjustmentType(type);
+                    if (type === 'reversal') {
+                      setAdjustedAmount('0');
+                    } else {
+                      setAdjustedAmount(payment.amount.toString());
+                    }
+                  }}
+                  className="form-control"
+                >
+                  <option value="correction">Correction (Partial or Full)</option>
+                  <option value="reversal">Full Reversal</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="adjustedAmount">Correct Amount</label>
+                <input
+                  id="adjustedAmount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={adjustedAmount}
+                  onChange={(e) => setAdjustedAmount(e.target.value)}
+                  className="form-control"
+                  disabled={adjustmentType === 'reversal'}
+                />
+                {adjustmentType === 'reversal' && (
+                  <small className="form-hint">Reversal will set amount to ₱0.00</small>
+                )}
+              </div>
+
+              {difference !== 0 && (
+                <div className={`adjustment-summary ${difference > 0 ? 'increase' : 'decrease'}`}>
+                  <span>Adjustment:</span>
+                  <strong>
+                    {difference > 0 ? '+' : ''}{formatCurrency(difference)}
+                  </strong>
                 </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="reason">
+                  Reason for Adjustment <span className="required">*</span>
+                </label>
+                <textarea
+                  id="reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  className="form-control"
+                  rows={4}
+                  placeholder="Please provide a detailed explanation for this adjustment (minimum 10 characters)..."
+                />
+                <small className="char-count">{reason.length} characters</small>
+              </div>
+
+              {errors.length > 0 && (
+                <div className="error-box">
+                  <strong>⚠️ Please fix the following errors:</strong>
+                  <ul>
+                    {errors.map((error, index) => (
+                      <li key={index}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="confirmation-box">
+              <div className="confirmation-icon">⚠️</div>
+              <h3>Confirm Payment Adjustment</h3>
+
+              <div className="confirmation-details">
+                <div className="detail-row">
+                  <span>Original Amount:</span>
+                  <strong>{formatCurrency(payment.amount)}</strong>
+                </div>
+                <div className="detail-row">
+                  <span>Adjusted Amount:</span>
+                  <strong className="highlight">{formatCurrency(parseFloat(adjustedAmount))}</strong>
+                </div>
+                <div className="detail-row">
+                  <span>Difference:</span>
+                  <strong className={difference > 0 ? 'increase' : 'decrease'}>
+                    {difference > 0 ? '+' : ''}{formatCurrency(difference)}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="warning-box">
+                <p><strong>This action will:</strong></p>
+                <ul>
+                  <li>Update the payment record</li>
+                  <li>Recalculate the invoice balance</li>
+                  <li>Create an audit log entry</li>
+                  <li>Record your user ID and timestamp</li>
+                </ul>
+                <p className="warning-text">
+                  ⚠️ <strong>This action cannot be undone.</strong>
+                </p>
+              </div>
             </div>
+          )}
+        </div>
 
-            <style>{`
+        <div className="modal-footer">
+          {!showConfirmation ? (
+            <>
+              <button className="btn-cancel" onClick={onClose} disabled={loading}>
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handleValidateAndConfirm}
+                disabled={loading}
+              >
+                Continue
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn-cancel"
+                onClick={() => setShowConfirmation(false)}
+                disabled={loading}
+              >
+                Back
+              </button>
+              <button
+                className="btn-danger"
+                onClick={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? 'Processing...' : 'Confirm Adjustment'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <style>{`
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -539,8 +548,8 @@ export const PaymentAdjustmentModal: React.FC<PaymentAdjustmentModalProps> = ({
           cursor: not-allowed;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default PaymentAdjustmentModal;

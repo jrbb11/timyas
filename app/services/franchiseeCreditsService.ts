@@ -286,7 +286,7 @@ export const franchiseeCreditsService = {
 
         // Update the payment record
         const { error: updateError } = await supabase
-            .from('payments')
+            .from('franchisee_invoice_payments')
             .update({
                 amount: data.adjusted_amount,
                 adjustment_type: data.adjustment_type,
@@ -322,7 +322,7 @@ export const franchiseeCreditsService = {
             .from('payment_adjustments')
             .select(`
         *,
-        payment:payments!payment_id(
+        payment:franchisee_invoice_payments!payment_id(
           invoice_id,
           payment_date,
           reference_number

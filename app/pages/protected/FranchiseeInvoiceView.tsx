@@ -45,6 +45,10 @@ const FranchiseeInvoiceView = () => {
     paymentAmount: 0,
   });
 
+  // Credit Application State
+  const [creditApplications, setCreditApplications] = useState<any[]>([]);
+  const [availableCredit, setAvailableCredit] = useState(0);
+
   useEffect(() => {
     if (id) loadInvoice();
     loadPaymentMethods();
@@ -68,6 +72,15 @@ const FranchiseeInvoiceView = () => {
       setInvoice(data);
       if (data?.invoice_date) {
         setNewInvoiceDate(data.invoice_date);
+      }
+
+      // Load credit applications
+      const { data: creditApps } = await franchiseeCreditsService.getInvoiceCreditApplications(id);
+      if (creditApps) setCreditApplications(creditApps);
+
+      // Load available credit if franchisee is known
+      if (data?.franchisee_id) {
+        loadFranchiseeCredits(data.franchisee_id);
       }
     }
     setLoading(false);
@@ -144,6 +157,40 @@ const FranchiseeInvoiceView = () => {
       setLoading(false);
     } else {
       navigate('/franchisee-invoices');
+    }
+  };
+
+  const loadFranchiseeCredits = async (franchiseeId: string) => {
+    const { balance } = await franchiseeCreditsService.getAvailableCreditBalance(franchiseeId);
+    setAvailableCredit(balance);
+  };
+
+  const handleApplyCredit = async () => {
+    if (!invoice?.id || !invoice?.franchisee_id) return;
+
+    if (!window.confirm('Are you sure you want to apply available credits to this invoice?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: appliedAmount, error } = await franchiseeCreditsService.autoApplyCreditsToInvoice(invoice.id);
+
+      if (error) throw error;
+
+      if (appliedAmount > 0) {
+        await loadInvoice();
+        // createCreditFromOverpayment might have changed balance
+        await loadFranchiseeCredits(invoice.franchisee_id);
+        alert(`Successfully applied ${formatCurrency(appliedAmount)} from available credits.`);
+      } else {
+        alert('No credits were applied. Either the invoice is paid or no credits are available.');
+      }
+    } catch (error) {
+      console.error('Error applying credits:', error);
+      alert('Failed to apply credits. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -563,14 +610,43 @@ const FranchiseeInvoiceView = () => {
                 <span>Total:</span>
                 <span>{formatCurrency(invoice.total_amount)}</span>
               </div>
+
+              {/* Split Paid and Credit */}
               <div className="flex justify-between text-green-600">
-                <span>Paid:</span>
-                <span className="font-medium">{formatCurrency(invoice.paid_amount)}</span>
+                <span>Paid (Cash/Cheque):</span>
+                <span className="font-medium">
+                  {formatCurrency(
+                    Math.max(0, parseFloat(invoice.paid_amount || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))
+                  )}
+                </span>
               </div>
+
+              {creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0) > 0 && (
+                <div className="flex justify-between text-purple-600 italic">
+                  <span>Used Credit:</span>
+                  <span className="font-medium">
+                    {formatCurrency(creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between text-lg font-bold text-orange-600 border-t pt-2">
                 <span>Balance Due:</span>
                 <span>{formatCurrency(invoice.balance)}</span>
               </div>
+
+              {/* Apply Credit Button */}
+              {invoice.balance > 0 && availableCredit > 0 && (
+                <div className="pt-4 text-right">
+                  <button
+                    onClick={handleApplyCredit}
+                    disabled={loading}
+                    className="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded hover:bg-purple-200 transition-colors"
+                  >
+                    ✨ Apply Available Credit ({formatCurrency(availableCredit)})
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
