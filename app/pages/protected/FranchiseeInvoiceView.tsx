@@ -615,9 +615,7 @@ const FranchiseeInvoiceView = () => {
               <div className="flex justify-between text-green-600">
                 <span>Paid (Cash/Cheque):</span>
                 <span className="font-medium">
-                  {formatCurrency(
-                    Math.max(0, parseFloat(invoice.paid_amount || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))
-                  )}
+                  {formatCurrency(invoice.paid_amount || 0)}
                 </span>
               </div>
 
@@ -632,11 +630,15 @@ const FranchiseeInvoiceView = () => {
 
               <div className="flex justify-between text-lg font-bold text-orange-600 border-t pt-2">
                 <span>Balance Due:</span>
-                <span>{formatCurrency(invoice.balance)}</span>
+                <span>
+                  {formatCurrency(
+                    Math.max(0, parseFloat(invoice.balance || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))
+                  )}
+                </span>
               </div>
 
               {/* Apply Credit Button */}
-              {invoice.balance > 0 && availableCredit > 0 && (
+              {(parseFloat(invoice.balance || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0)) > 0 && availableCredit > 0 && (
                 <div className="pt-4 text-right">
                   <button
                     onClick={handleApplyCredit}
@@ -659,10 +661,10 @@ const FranchiseeInvoiceView = () => {
           )}
         </div>
 
-        {/* Payment History */}
-        {invoice.payments && invoice.payments.length > 0 && (
+        {/* Payment History and Credits */}
+        {((invoice.payments && invoice.payments.length > 0) || (creditApplications && creditApplications.length > 0)) && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="font-bold text-gray-900 mb-4">Payment History</h3>
+            <h3 className="font-bold text-gray-900 mb-4">Payment & Credit History</h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -674,7 +676,7 @@ const FranchiseeInvoiceView = () => {
                       Amount
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Payment Method
+                      Method / Type
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Reference
@@ -691,47 +693,86 @@ const FranchiseeInvoiceView = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {invoice.payments.map((payment: any) => (
-                    <tr key={payment.id}>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {formatDate(payment.payment_date)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-green-600">
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {payment.payment_method?.name || 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {payment.reference_number || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        {payment.notes || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {payment.receipt_url ? (
-                          <a
-                            href={payment.receipt_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 underline"
-                          >
-                            View Receipt
-                          </a>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <button
-                          onClick={() => handleAdjustPayment(payment)}
-                          className="text-blue-600 hover:text-blue-800 underline text-sm"
-                        >
-                          Adjust
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {/* Combine and Sort Payments and Credits */}
+                  {[
+                    ...(invoice.payments || []).map((p: any) => ({ ...p, type: 'payment', sortDate: p.payment_date })),
+                    ...(creditApplications || []).map((c: any) => ({ ...c, type: 'credit', sortDate: c.applied_at }))
+                  ]
+                    .sort((a: any, b: any) => new Date(a.sortDate).getTime() - new Date(b.sortDate).getTime())
+                    .map((item: any, index: number) => (
+                      <tr key={`${item.type}-${item.id || index}`}>
+                        {/* Date */}
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {formatDate(item.sortDate)}
+                          <div className="text-xs text-gray-500">
+                            {new Date(item.sortDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </td>
+
+                        {/* Amount */}
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {item.type === 'payment' ? (
+                            <span className={item.amount === 0 ? 'text-gray-400' : 'text-green-600'}>
+                              {formatCurrency(item.amount)}
+                            </span>
+                          ) : (
+                            <span className="text-purple-600">
+                              {formatCurrency(item.amount_applied)}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Method */}
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.type === 'payment' ? (
+                            item.payment_method?.name || 'N/A'
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                              Store Credit
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Reference */}
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.type === 'payment' ? (
+                            item.reference_number || '-'
+                          ) : (
+                            <span className="text-xs">From: {item.credit?.source_type || 'Credit'}</span>
+                          )}
+                        </td>
+
+                        {/* Notes */}
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.type === 'payment' ? (
+                            item.notes || '-'
+                          ) : (
+                            <span className="italic text-xs text-gray-500">{item.credit?.notes || 'Auto-applied'}</span>
+                          )}
+                        </td>
+
+                        {/* Receipt (Payment only) */}
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.type === 'payment' && item.receipt_url ? (
+                            <a href={item.receipt_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900">
+                              View
+                            </a>
+                          ) : '-'}
+                        </td>
+
+                        {/* Actions (Payment only) */}
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.type === 'payment' && (
+                            <button
+                              onClick={() => handleAdjustPayment(item)}
+                              className="text-blue-600 hover:text-blue-900 hover:underline"
+                            >
+                              Adjust
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
