@@ -57,8 +57,19 @@ const FranchiseeInvoiceView = () => {
   const handleUpdateDate = async () => {
     if (!id || !newInvoiceDate) return;
 
+    // Calculate the number of days between original invoice_date and due_date
+    const originalInvoiceDate = new Date(invoice.invoice_date);
+    const originalDueDate = new Date(invoice.due_date);
+    const dueDays = Math.round((originalDueDate.getTime() - originalInvoiceDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Calculate new due_date based on new invoice_date
+    const newInvoiceDateObj = new Date(newInvoiceDate);
+    const newDueDate = new Date(newInvoiceDateObj);
+    newDueDate.setDate(newDueDate.getDate() + dueDays);
+
     const { error: err } = await franchiseeInvoicesService.update(id, {
-      invoice_date: newInvoiceDate
+      invoice_date: newInvoiceDate,
+      due_date: newDueDate.toISOString().split('T')[0]
     });
 
     if (err) {
@@ -431,6 +442,14 @@ const FranchiseeInvoiceView = () => {
                 <span>Subtotal:</span>
                 <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
               </div>
+              {(invoice.items?.reduce((sum: number, item: any) => sum + parseFloat(item.shipping || 0), 0) || 0) > 0 && (
+                <div className="flex justify-between text-gray-700">
+                  <span>Shipping Fee:</span>
+                  <span className="font-medium text-blue-600">{formatCurrency(
+                    invoice.items?.reduce((sum: number, item: any) => sum + parseFloat(item.shipping || 0), 0) || 0
+                  )}</span>
+                </div>
+              )}
               {parseFloat(invoice.discount) > 0 && (
                 <div className="flex justify-between text-gray-700">
                   <span>Discount:</span>
