@@ -2,168 +2,170 @@ import React, { useEffect, useState } from 'react';
 import { franchiseeCreditsService, type CreditWithInvoice } from '../../services/franchiseeCreditsService';
 
 interface CreditHistoryModalProps {
-    franchiseeId: string;
-    isOpen: boolean;
-    onClose: () => void;
+  franchiseeId: string;
+  peopleBranchesId?: string;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
-    franchiseeId,
-    isOpen,
-    onClose,
+  franchiseeId,
+  peopleBranchesId,
+  isOpen,
+  onClose,
 }) => {
-    const [loading, setLoading] = useState(true);
-    const [credits, setCredits] = useState<CreditWithInvoice[]>([]);
-    const [showUsed, setShowUsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState<CreditWithInvoice[]>([]);
+  const [showUsed, setShowUsed] = useState(false);
 
-    useEffect(() => {
-        if (isOpen) {
-            loadCreditHistory();
-        }
-    }, [isOpen, franchiseeId, showUsed]);
+  useEffect(() => {
+    if (isOpen) {
+      loadCreditHistory();
+    }
+  }, [isOpen, franchiseeId, showUsed]);
 
-    const loadCreditHistory = async () => {
-        setLoading(true);
-        const { data, error } = await franchiseeCreditsService.getFranchiseeCredits(franchiseeId, showUsed);
+  const loadCreditHistory = async () => {
+    setLoading(true);
+    const { data, error } = await franchiseeCreditsService.getFranchiseeCredits(franchiseeId, peopleBranchesId, showUsed);
 
-        if (!error && data) {
-            setCredits(data as CreditWithInvoice[]);
-        }
+    if (!error && data) {
+      setCredits(data as CreditWithInvoice[]);
+    }
 
-        setLoading(false);
-    };
+    setLoading(false);
+  };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-        }).format(amount);
-    };
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
 
-    const getSourceLabel = (sourceType: string) => {
-        switch (sourceType) {
-            case 'overpayment':
-                return '💰 Overpayment';
-            case 'return':
-                return '↩️ Return';
-            case 'adjustment':
-                return '🔧 Adjustment';
-            default:
-                return sourceType;
-        }
-    };
+  const getSourceLabel = (sourceType: string) => {
+    switch (sourceType) {
+      case 'overpayment':
+        return '💰 Overpayment';
+      case 'return':
+        return '↩️ Return';
+      case 'adjustment':
+        return '🔧 Adjustment';
+      default:
+        return sourceType;
+    }
+  };
 
-    if (!isOpen) return null;
+  if (!isOpen) return null;
 
-    return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <h2>Credit History</h2>
-                    <button className="close-button" onClick={onClose}>×</button>
-                </div>
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Credit History</h2>
+          <button className="close-button" onClick={onClose}>×</button>
+        </div>
 
-                <div className="modal-body">
-                    <div className="filter-bar">
-                        <label className="checkbox-label">
-                            <input
-                                type="checkbox"
-                                checked={showUsed}
-                                onChange={(e) => setShowUsed(e.target.checked)}
-                            />
-                            <span>Show fully used credits</span>
-                        </label>
-                    </div>
+        <div className="modal-body">
+          <div className="filter-bar">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={showUsed}
+                onChange={(e) => setShowUsed(e.target.checked)}
+              />
+              <span>Show fully used credits</span>
+            </label>
+          </div>
 
-                    {loading ? (
-                        <div className="loading-state">
-                            <div className="spinner">Loading...</div>
-                        </div>
-                    ) : credits.length === 0 ? (
-                        <div className="empty-state">
-                            <p>No credit history found</p>
-                        </div>
-                    ) : (
-                        <div className="credits-list">
-                            {credits.map((credit) => (
-                                <div key={credit.id} className="credit-item">
-                                    <div className="credit-header">
-                                        <div className="credit-source">
-                                            {getSourceLabel(credit.source_type)}
-                                        </div>
-                                        <div className="credit-date">
-                                            {formatDate(credit.created_at)}
-                                        </div>
-                                    </div>
-
-                                    <div className="credit-amounts">
-                                        <div className="amount-row">
-                                            <span>Original Amount:</span>
-                                            <span className="amount">{formatCurrency(credit.amount)}</span>
-                                        </div>
-                                        <div className="amount-row">
-                                            <span>Used:</span>
-                                            <span className="amount used">
-                                                {formatCurrency(credit.used_amount)}
-                                            </span>
-                                        </div>
-                                        <div className="amount-row">
-                                            <span>Remaining:</span>
-                                            <span className={`amount ${credit.remaining_amount > 0 ? 'available' : 'depleted'}`}>
-                                                {formatCurrency(credit.remaining_amount)}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {credit.source_invoice && (
-                                        <div className="credit-source-info">
-                                            <span>Source Invoice: </span>
-                                            <strong>{credit.source_invoice.invoice_number}</strong>
-                                        </div>
-                                    )}
-
-                                    {credit.notes && (
-                                        <div className="credit-notes">
-                                            <em>{credit.notes}</em>
-                                        </div>
-                                    )}
-
-                                    {credit.applications && credit.applications.length > 0 && (
-                                        <div className="applications-section">
-                                            <div className="applications-header">Applied To:</div>
-                                            <div className="applications-list">
-                                                {credit.applications.map((app) => (
-                                                    <div key={app.invoice_id} className="application-item">
-                                                        <span>{app.invoice?.invoice_number || app.invoice_id}</span>
-                                                        <span>{formatCurrency(app.amount_applied)}</span>
-                                                        <span className="app-date">{formatDate(app.applied_at)}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="modal-footer">
-                    <button className="btn-close" onClick={onClose}>
-                        Close
-                    </button>
-                </div>
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner">Loading...</div>
             </div>
+          ) : credits.length === 0 ? (
+            <div className="empty-state">
+              <p>No credit history found</p>
+            </div>
+          ) : (
+            <div className="credits-list">
+              {credits.map((credit) => (
+                <div key={credit.id} className="credit-item">
+                  <div className="credit-header">
+                    <div className="credit-source">
+                      {getSourceLabel(credit.source_type)}
+                    </div>
+                    <div className="credit-date">
+                      {formatDate(credit.created_at)}
+                    </div>
+                  </div>
 
-            <style>{`
+                  <div className="credit-amounts">
+                    <div className="amount-row">
+                      <span>Original Amount:</span>
+                      <span className="amount">{formatCurrency(credit.amount)}</span>
+                    </div>
+                    <div className="amount-row">
+                      <span>Used:</span>
+                      <span className="amount used">
+                        {formatCurrency(credit.used_amount)}
+                      </span>
+                    </div>
+                    <div className="amount-row">
+                      <span>Remaining:</span>
+                      <span className={`amount ${credit.remaining_amount > 0 ? 'available' : 'depleted'}`}>
+                        {formatCurrency(credit.remaining_amount)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {credit.source_invoice && (
+                    <div className="credit-source-info">
+                      <span>Source Invoice: </span>
+                      <strong>{credit.source_invoice.invoice_number}</strong>
+                    </div>
+                  )}
+
+                  {credit.notes && (
+                    <div className="credit-notes">
+                      <em>{credit.notes}</em>
+                    </div>
+                  )}
+
+                  {credit.applications && credit.applications.length > 0 && (
+                    <div className="applications-section">
+                      <div className="applications-header">Applied To:</div>
+                      <div className="applications-list">
+                        {credit.applications.map((app) => (
+                          <div key={app.invoice_id} className="application-item">
+                            <span>{app.invoice?.invoice_number || app.invoice_id}</span>
+                            <span>{formatCurrency(app.amount_applied)}</span>
+                            <span className="app-date">{formatDate(app.applied_at)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-close" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+
+      <style>{`
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -386,8 +388,8 @@ export const CreditHistoryModal: React.FC<CreditHistoryModalProps> = ({
           background: #4b5563;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default CreditHistoryModal;

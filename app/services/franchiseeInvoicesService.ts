@@ -17,6 +17,7 @@ export interface FranchiseeInvoice {
   total_amount: number;
   payment_status: 'unpaid' | 'partial' | 'paid' | 'overdue';
   paid_amount: number;
+  credit_amount: number;
   balance: number;
   status: 'draft' | 'sent' | 'approved' | 'cancelled';
   notes?: string;
@@ -78,7 +79,7 @@ export interface InvoiceSummary {
 
 export const franchiseeInvoicesService = {
   // ==================== INVOICES ====================
-  
+
   /**
    * Get all franchisee invoices with optional filters
    */
@@ -492,7 +493,7 @@ export const franchiseeInvoicesService = {
   async getInvoicesForReminders(daysBeforeDue: number = 3) {
     const reminderDate = new Date();
     reminderDate.setDate(reminderDate.getDate() + daysBeforeDue);
-    
+
     return supabase
       .from('franchisee_invoices')
       .select(`

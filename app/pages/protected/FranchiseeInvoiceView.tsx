@@ -78,9 +78,9 @@ const FranchiseeInvoiceView = () => {
       const { data: creditApps } = await franchiseeCreditsService.getInvoiceCreditApplications(id);
       if (creditApps) setCreditApplications(creditApps);
 
-      // Load available credit if franchisee is known
-      if (data?.franchisee_id) {
-        loadFranchiseeCredits(data.franchisee_id);
+      // Load available credit if branch is known
+      if (data?.people_branches_id) {
+        loadFranchiseeCredits(data.people_branches_id);
       }
     }
     setLoading(false);
@@ -160,8 +160,8 @@ const FranchiseeInvoiceView = () => {
     }
   };
 
-  const loadFranchiseeCredits = async (franchiseeId: string) => {
-    const { balance } = await franchiseeCreditsService.getAvailableCreditBalance(franchiseeId);
+  const loadFranchiseeCredits = async (peopleBranchesId: string) => {
+    const { balance } = await franchiseeCreditsService.getAvailableCreditBalance(peopleBranchesId);
     setAvailableCredit(balance);
   };
 
@@ -241,17 +241,8 @@ const FranchiseeInvoiceView = () => {
         return;
       }
 
-      // Create credit if overpayment
-      if (paymentAmountNum > invoiceBalance) {
-        const excessAmount = paymentAmountNum - invoiceBalance;
-
-        await franchiseeCreditsService.createCreditFromOverpayment({
-          franchisee_id: invoice.franchisee_id,
-          amount: excessAmount,
-          source_invoice_id: id,
-          notes: `Overpayment from invoice ${invoice.invoice_number}`,
-        });
-      }
+      // NOTE: Credit creation for overpayment is now handled by the BACKEND TRIGGER
+      // on update_franchisee_invoice_payment_status(). We don't need to call it here.
 
       // Reset form and close modals
       setShowPaymentModal(false);
@@ -456,10 +447,11 @@ const FranchiseeInvoiceView = () => {
           </div>
 
           {/* Credit Balance Card */}
-          {invoice.franchisee_id && (
+          {invoice.franchisee_id && invoice.people_branches_id && (
             <div className="mb-8">
               <CreditBalanceCard
                 franchiseeId={invoice.franchisee_id}
+                peopleBranchesId={invoice.people_branches_id}
                 onViewHistory={() => setShowCreditHistory(true)}
               />
             </div>
@@ -619,11 +611,11 @@ const FranchiseeInvoiceView = () => {
                 </span>
               </div>
 
-              {creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0) > 0 && (
+              {parseFloat(invoice.credit_amount || '0') > 0 && (
                 <div className="flex justify-between text-purple-600 italic">
                   <span>Used Credit:</span>
                   <span className="font-medium">
-                    {formatCurrency(creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))}
+                    {formatCurrency(invoice.credit_amount)}
                   </span>
                 </div>
               )}
@@ -631,14 +623,12 @@ const FranchiseeInvoiceView = () => {
               <div className="flex justify-between text-lg font-bold text-orange-600 border-t pt-2">
                 <span>Balance Due:</span>
                 <span>
-                  {formatCurrency(
-                    Math.max(0, parseFloat(invoice.balance || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0))
-                  )}
+                  {formatCurrency(invoice.balance || 0)}
                 </span>
               </div>
 
               {/* Apply Credit Button */}
-              {(parseFloat(invoice.balance || '0') - creditApplications.reduce((sum, app) => sum + parseFloat(app.amount_applied), 0)) > 0 && availableCredit > 0 && (
+              {parseFloat(invoice.balance || '0') > 0 && availableCredit > 0 && (
                 <div className="pt-4 text-right">
                   <button
                     onClick={handleApplyCredit}
@@ -901,6 +891,7 @@ const FranchiseeInvoiceView = () => {
       {invoice && (
         <CreditHistoryModal
           franchiseeId={invoice.franchisee_id}
+          peopleBranchesId={invoice.people_branches_id}
           isOpen={showCreditHistory}
           onClose={() => setShowCreditHistory(false)}
         />

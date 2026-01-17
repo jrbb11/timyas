@@ -8,6 +8,7 @@ export type AdjustmentType = 'reversal' | 'correction';
 export interface FranchiseeCredit {
     id: string;
     franchisee_id: string;
+    people_branches_id: string;
     amount: number;
     source_type: CreditSource;
     source_invoice_id?: string;
@@ -62,21 +63,25 @@ export const franchiseeCreditsService = {
     /**
      * Get all credits for a franchisee
      */
-    async getFranchiseeCredits(franchiseeId: string, includeUsed: boolean = false) {
+    async getFranchiseeCredits(franchiseeId: string, peopleBranchesId?: string, includeUsed: boolean = false) {
         let query = supabase
             .from('franchisee_credits')
             .select(`
         *,
-        source_invoice:invoices!source_invoice_id(invoice_number, invoice_date),
+        source_invoice:franchisee_invoices!source_invoice_id(invoice_number, invoice_date),
         applications:credit_applications(
           invoice_id,
           amount_applied,
           applied_at,
-          invoice:invoices(invoice_number)
+          invoice:franchisee_invoices(invoice_number)
         )
       `)
             .eq('franchisee_id', franchiseeId)
             .order('created_at', { ascending: false });
+
+        if (peopleBranchesId) {
+            query = query.eq('people_branches_id', peopleBranchesId);
+        }
 
         if (!includeUsed) {
             query = query.gt('remaining_amount', 0);
@@ -111,9 +116,9 @@ export const franchiseeCreditsService = {
     /**
      * Get available credit balance for a franchisee
      */
-    async getAvailableCreditBalance(franchiseeId: string): Promise<{ balance: number; error: any }> {
+    async getAvailableCreditBalance(peopleBranchesId: string): Promise<{ balance: number; error: any }> {
         const { data, error } = await supabase
-            .rpc('get_franchisee_available_credit', { p_franchisee_id: franchiseeId });
+            .rpc('get_franchisee_available_credit', { p_people_branches_id: peopleBranchesId });
 
         if (error) {
             console.error('Error getting credit balance:', error);

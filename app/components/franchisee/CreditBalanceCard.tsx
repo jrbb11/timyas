@@ -2,105 +2,108 @@ import React, { useEffect, useState } from 'react';
 import { franchiseeCreditsService } from '../../services/franchiseeCreditsService';
 
 interface CreditBalanceCardProps {
-    franchiseeId: string;
-    onViewHistory?: () => void;
+  franchiseeId: string;
+  peopleBranchesId: string;
+  onViewHistory?: () => void;
 }
 
 export const CreditBalanceCard: React.FC<CreditBalanceCardProps> = ({
-    franchiseeId,
-    onViewHistory,
+  franchiseeId,
+  peopleBranchesId,
+  onViewHistory,
 }) => {
-    const [loading, setLoading] = useState(true);
-    const [balance, setBalance] = useState(0);
-    const [summary, setSummary] = useState({
-        total_credits: 0,
-        total_used: 0,
-        total_remaining: 0,
-    });
+  const [loading, setLoading] = useState(true);
+  const [balance, setBalance] = useState(0);
+  const [summary, setSummary] = useState({
+    total_credits: 0,
+    total_used: 0,
+    total_remaining: 0,
+  });
 
-    useEffect(() => {
-        loadCreditData();
-    }, [franchiseeId]);
+  useEffect(() => {
+    loadCreditData();
+  }, [peopleBranchesId]);
 
-    const loadCreditData = async () => {
-        setLoading(true);
+  const loadCreditData = async () => {
+    setLoading(true);
 
-        // Get available balance
-        const { balance: availableBalance } = await franchiseeCreditsService.getAvailableCreditBalance(franchiseeId);
-        setBalance(availableBalance);
+    // Get available balance for SPECIFIC BRANCH
+    const { balance: availableBalance } = await franchiseeCreditsService.getAvailableCreditBalance(peopleBranchesId);
+    setBalance(availableBalance);
 
-        // Get credit summary
-        const { summary: creditSummary } = await franchiseeCreditsService.getCreditSummary(franchiseeId);
-        setSummary(creditSummary);
+    // Get credit summary for THE WHOLE FRANCHISEE (optional, or we could also branch-isolate this)
+    // For now, let's keep summary per franchisee but balance per branch
+    const { summary: creditSummary } = await franchiseeCreditsService.getCreditSummary(franchiseeId);
+    setSummary(creditSummary);
 
-        setLoading(false);
-    };
+    setLoading(false);
+  };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-        }).format(amount);
-    };
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
 
-    if (loading) {
-        return (
-            <div className="credit-balance-card loading">
-                <div className="spinner">Loading...</div>
-            </div>
-        );
-    }
-
+  if (loading) {
     return (
-        <div className="credit-balance-card">
-            <div className="card-header">
-                <h3>💳 Credit Balance</h3>
+      <div className="credit-balance-card loading">
+        <div className="spinner">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="credit-balance-card">
+      <div className="card-header">
+        <h3>💳 Credit Balance</h3>
+      </div>
+
+      <div className="card-body">
+        <div className="balance-display">
+          <div className="balance-amount">
+            <span className="label">Available Credit:</span>
+            <span className="amount">{formatCurrency(balance)}</span>
+          </div>
+
+          {balance > 0 && (
+            <div className="credit-info">
+              <p className="info-text">
+                ℹ️ This credit will be automatically applied to your next invoice
+              </p>
             </div>
+          )}
+        </div>
 
-            <div className="card-body">
-                <div className="balance-display">
-                    <div className="balance-amount">
-                        <span className="label">Available Credit:</span>
-                        <span className="amount">{formatCurrency(balance)}</span>
-                    </div>
-
-                    {balance > 0 && (
-                        <div className="credit-info">
-                            <p className="info-text">
-                                ℹ️ This credit will be automatically applied to your next invoice
-                            </p>
-                        </div>
-                    )}
-                </div>
-
-                {summary.total_credits > 0 && (
-                    <div className="credit-summary">
-                        <div className="summary-row">
-                            <span>Total Credits:</span>
-                            <span>{formatCurrency(summary.total_credits)}</span>
-                        </div>
-                        <div className="summary-row">
-                            <span>Used:</span>
-                            <span className="used">{formatCurrency(summary.total_used)}</span>
-                        </div>
-                        <div className="summary-row">
-                            <span>Remaining:</span>
-                            <span className="remaining">{formatCurrency(summary.total_remaining)}</span>
-                        </div>
-                    </div>
-                )}
-
-                {onViewHistory && (
-                    <button
-                        className="btn-view-history"
-                        onClick={onViewHistory}
-                    >
-                        View Credit History
-                    </button>
-                )}
+        {summary.total_credits > 0 && (
+          <div className="credit-summary">
+            <div className="summary-row">
+              <span>Total Credits:</span>
+              <span>{formatCurrency(summary.total_credits)}</span>
             </div>
+            <div className="summary-row">
+              <span>Used:</span>
+              <span className="used">{formatCurrency(summary.total_used)}</span>
+            </div>
+            <div className="summary-row">
+              <span>Remaining:</span>
+              <span className="remaining">{formatCurrency(summary.total_remaining)}</span>
+            </div>
+          </div>
+        )}
 
-            <style>{`
+        {onViewHistory && (
+          <button
+            className="btn-view-history"
+            onClick={onViewHistory}
+          >
+            View Credit History
+          </button>
+        )}
+      </div>
+
+      <style>{`
         .credit-balance-card {
           Background: white;
           border: 1px solid #e5e7eb;
@@ -220,8 +223,8 @@ export const CreditBalanceCard: React.FC<CreditBalanceCardProps> = ({
           color: #667eea;
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default CreditBalanceCard;
