@@ -10,8 +10,8 @@ type FranchiseeOption = {
   id: string;
   name: string;
   people_branches_id: string;
-  branch_id?: string;
-  branch_name?: string;
+  branch_id: string;
+  branch_name: string;
 };
 
 const FranchiseeInvoicesList = () => {
@@ -44,22 +44,17 @@ const FranchiseeInvoicesList = () => {
   }, [selectedFranchisee, selectedStatus, selectedPaymentStatus, fromDate, toDate]);
 
   const loadFranchisees = async () => {
-    const { data, error } = await supabase
-      .from('people_branches')
-      .select(`
-        id,
-        branch_id,
-        branch:branches!people_branches_branch_id_fkey(name),
-        person:people!people_branches_person_id_fkey(id, name)
-      `);
+    const { data } = await supabase
+      .from('people_branches_view')
+      .select('*');
 
     if (data) {
       const options = data.map((pb: any) => ({
-        id: pb.person.id,
-        name: pb.person.name,
+        id: pb.person_id,
+        name: pb.person_name,
         people_branches_id: pb.id,
         branch_id: pb.branch_id,
-        branch_name: pb.branch?.name
+        branch_name: pb.branch_name
       }));
       setFranchisees(options);
     }

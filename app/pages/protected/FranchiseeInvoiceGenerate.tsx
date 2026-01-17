@@ -17,14 +17,14 @@ const FranchiseeInvoiceGenerate = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  
+
   const [franchisees, setFranchisees] = useState<FranchiseeOption[]>([]);
   const [selectedPeopleBranches, setSelectedPeopleBranches] = useState('');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [dueDays, setDueDays] = useState(30);
   const [notes, setNotes] = useState('');
-  
+
   // Preview data
   const [preview, setPreview] = useState<any>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -40,21 +40,17 @@ const FranchiseeInvoiceGenerate = () => {
   }, []);
 
   const loadFranchisees = async () => {
-    const { data, error } = await supabase
-      .from('people_branches')
-      .select(`
-        id,
-        person:people!people_branches_person_id_fkey(id, name),
-        branch:branches!people_branches_branch_id_fkey(id, name)
-      `);
-    
+    const { data } = await supabase
+      .from('people_branches_view')
+      .select('*');
+
     if (data) {
       const options: FranchiseeOption[] = data.map((pb: any) => ({
         people_branches_id: pb.id,
-        person_id: pb.person.id,
-        person_name: pb.person.name,
-        branch_id: pb.branch.id,
-        branch_name: pb.branch.name
+        person_id: pb.person_id,
+        person_name: pb.person_name,
+        branch_id: pb.branch_id,
+        branch_name: pb.branch_name
       }));
       setFranchisees(options);
     }
@@ -115,15 +111,15 @@ const FranchiseeInvoiceGenerate = () => {
 
     try {
       const appUserId = await getCurrentAppUserId();
-      
+
       console.log('Current app_user_id:', appUserId);
-      
+
       if (!appUserId) {
         throw new Error('User not found in app_users table. Please contact administrator to create your app_users record.');
       }
-      
+
       console.log('Generating invoice with created_by:', appUserId);
-      
+
       const { data, error: genError } = await franchiseeInvoicesService.generateInvoice({
         people_branches_id: selectedPeopleBranches,
         period_start: periodStart,
@@ -156,8 +152,8 @@ const FranchiseeInvoiceGenerate = () => {
   const selectedFranchisee = franchisees.find(f => f.people_branches_id === selectedPeopleBranches);
 
   return (
-    <AdminLayout 
-      title="Generate Invoice" 
+    <AdminLayout
+      title="Generate Invoice"
       breadcrumb={
         <span>
           Invoicing &gt; Franchisee Invoices &gt; <span className="text-gray-900">Generate</span>
@@ -281,7 +277,7 @@ const FranchiseeInvoiceGenerate = () => {
             {showPreview && preview && (
               <div className="border-t pt-6 mt-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Invoice Preview</h3>
-                
+
                 <div className="bg-gray-50 rounded-lg p-6 mb-4">
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>

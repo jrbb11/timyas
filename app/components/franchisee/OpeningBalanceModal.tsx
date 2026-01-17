@@ -13,8 +13,8 @@ interface OpeningBalanceModalProps {
         id: string;
         name: string;
         people_branches_id: string;
-        branch_id?: string;
-        branch_name?: string;
+        branch_id: string;
+        branch_name: string;
     }>;
     isOpen: boolean;
     onClose: () => void;
