@@ -599,12 +599,12 @@ const FranchiseeInvoiceView = () => {
                 <span className="font-medium">{formatCurrency(invoice.tax_amount)}</span>
               </div>
               <div className="flex justify-between text-xl font-bold text-gray-900 border-t pt-2">
-                <span>Total:</span>
+                <span>New Charges Total:</span>
                 <span>{formatCurrency(invoice.total_amount)}</span>
               </div>
 
-              {/* Split Paid and Credit */}
-              <div className="flex justify-between text-green-600">
+              {/* Split Paid and Credit for New Charges */}
+              <div className="flex justify-between text-green-600 text-sm">
                 <span>Paid (Cash/Cheque):</span>
                 <span className="font-medium">
                   {formatCurrency(invoice.paid_amount || 0)}
@@ -612,7 +612,7 @@ const FranchiseeInvoiceView = () => {
               </div>
 
               {parseFloat(invoice.credit_amount || '0') > 0 && (
-                <div className="flex justify-between text-purple-600 italic">
+                <div className="flex justify-between text-purple-600 italic text-sm">
                   <span>Used Credit:</span>
                   <span className="font-medium">
                     {formatCurrency(invoice.credit_amount)}
@@ -620,10 +620,22 @@ const FranchiseeInvoiceView = () => {
                 </div>
               )}
 
-              <div className="flex justify-between text-lg font-bold text-orange-600 border-t pt-2">
-                <span>Balance Due:</span>
+              <div className="flex justify-between text-gray-700 font-medium border-t mt-2 pt-2">
+                <span>Current Invoice Balance:</span>
+                <span>{formatCurrency(invoice.balance || 0)}</span>
+              </div>
+
+              {parseFloat(invoice.previous_balance || '0') > 0 && (
+                <div className="flex justify-between text-red-600 font-medium">
+                  <span>Previous Balance (Arrears):</span>
+                  <span>{formatCurrency(invoice.previous_balance)}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-lg font-bold text-orange-600 border-t pt-2 mt-2">
+                <span>Total Amount Due:</span>
                 <span>
-                  {formatCurrency(invoice.balance || 0)}
+                  {formatCurrency((parseFloat(invoice.balance || '0')) + (parseFloat(invoice.previous_balance || '0')))}
                 </span>
               </div>
 

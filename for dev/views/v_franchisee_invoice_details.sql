@@ -11,6 +11,7 @@ select
   fi.total_amount,
   fi.paid_amount,
   fi.balance,
+  fi.previous_balance,
   p.id as franchisee_id,
   p.name as franchisee_name,
   p.email as franchisee_email,

@@ -16,6 +16,7 @@ create table public.franchisee_invoices (
   payment_status text not null default 'unpaid'::text,
   paid_amount numeric(14, 2) not null default 0,
   credit_amount numeric(14, 2) not null default 0,
+  previous_balance numeric(14, 2) not null default 0,
   balance numeric(14, 2) not null default 0,
   status text not null default 'draft'::text,
   notes text null,

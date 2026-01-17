@@ -1,108 +1,109 @@
 import React from 'react';
 
 interface OverpaymentConfirmationProps {
-    invoiceAmount: number;
-    paymentAmount: number;
-    invoiceNumber?: string;
-    isOpen: boolean;
-    onConfirm: () => void;
-    onCancel: () => void;
+  invoiceAmount: number;
+  paymentAmount: number;
+  invoiceNumber?: string;
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
 export const OverpaymentConfirmation: React.FC<OverpaymentConfirmationProps> = ({
-    invoiceAmount,
-    paymentAmount,
-    invoiceNumber,
-    isOpen,
-    onConfirm,
-    onCancel,
+  invoiceAmount,
+  paymentAmount,
+  invoiceNumber,
+  isOpen,
+  onConfirm,
+  onCancel,
 }) => {
-    const excessAmount = paymentAmount - invoiceAmount;
+  const excessAmount = paymentAmount - invoiceAmount;
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP',
-        }).format(amount);
-    };
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
 
-    if (!isOpen || excessAmount <= 0) return null;
+  if (!isOpen || excessAmount <= 0) return null;
 
-    return (
-        <div className="modal-overlay" onClick={onCancel}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                <div className="modal-header">
-                    <div className="warning-icon">⚠️</div>
-                    <h2>Overpayment Detected</h2>
-                </div>
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="warning-icon">⚠️</div>
+          <h2>Overpayment Detected</h2>
+        </div>
 
-                <div className="modal-body">
-                    {invoiceNumber && (
-                        <div className="invoice-info">
-                            <strong>Invoice: {invoiceNumber}</strong>
-                        </div>
-                    )}
+        <div className="modal-body">
+          {invoiceNumber && (
+            <div className="invoice-info">
+              <strong>Invoice: {invoiceNumber}</strong>
+            </div>
+          )}
 
-                    <div className="amounts-display">
-                        <div className="amount-row">
-                            <span className="label">Invoice Amount:</span>
-                            <span className="value">{formatCurrency(invoiceAmount)}</span>
-                        </div>
-
-                        <div className="amount-row">
-                            <span className="label">Payment Entered:</span>
-                            <span className="value payment">{formatCurrency(paymentAmount)}</span>
-                        </div>
-
-                        <div className="divider"></div>
-
-                        <div className="amount-row excess">
-                            <span className="label">Excess Amount:</span>
-                            <span className="value">{formatCurrency(excessAmount)}</span>
-                        </div>
-                    </div>
-
-                    <div className="info-box">
-                        <div className="info-icon">ℹ️</div>
-                        <div className="info-content">
-                            <p><strong>What happens next:</strong></p>
-                            <ul>
-                                <li>The excess amount of <strong>{formatCurrency(excessAmount)}</strong> will be added as a credit balance for this franchisee</li>
-                                <li>This credit will be <strong>automatically applied</strong> to the next invoice</li>
-                                <li>You can view the credit history in the franchisee's account page</li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    <div className="confirmation-checkbox">
-                        <label className="checkbox-label">
-                            <input type="checkbox" id="confirmOverpayment" required />
-                            <span>I confirm this payment amount is correct</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div className="modal-footer">
-                    <button className="btn-cancel" onClick={onCancel}>
-                        Cancel
-                    </button>
-                    <button
-                        className="btn-confirm"
-                        onClick={() => {
-                            const checkbox = document.getElementById('confirmOverpayment') as HTMLInputElement;
-                            if (checkbox && checkbox.checked) {
-                                onConfirm();
-                            } else {
-                                alert('Please confirm that the payment amount is correct');
-                            }
-                        }}
-                    >
-                        Confirm Payment
-                    </button>
-                </div>
+          <div className="amounts-display">
+            <div className="amount-row">
+              <span className="label">Invoice Amount:</span>
+              <span className="value">{formatCurrency(invoiceAmount)}</span>
             </div>
 
-            <style>{`
+            <div className="amount-row">
+              <span className="label">Payment Entered:</span>
+              <span className="value payment">{formatCurrency(paymentAmount)}</span>
+            </div>
+
+            <div className="divider"></div>
+
+            <div className="amount-row excess">
+              <span className="label">Excess Amount:</span>
+              <span className="value">{formatCurrency(excessAmount)}</span>
+            </div>
+          </div>
+
+          <div className="info-box">
+            <div className="info-icon">ℹ️</div>
+            <div className="info-content">
+              <p><strong>What happens next:</strong></p>
+              <ul>
+                <li>The excess amount of <strong>{formatCurrency(excessAmount)}</strong> will be converted to a credit balance for this branch</li>
+                <li>This credit will be <strong>automatically applied to any old unpaid invoices</strong> (waterfall payment)</li>
+                <li>Any remaining amount will be available for future invoices</li>
+                <li>You can view the credit history in the franchisee's credit history modal</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="confirmation-checkbox">
+            <label className="checkbox-label">
+              <input type="checkbox" id="confirmOverpayment" required />
+              <span>I confirm this payment amount is correct</span>
+            </label>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-cancel" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="btn-confirm"
+            onClick={() => {
+              const checkbox = document.getElementById('confirmOverpayment') as HTMLInputElement;
+              if (checkbox && checkbox.checked) {
+                onConfirm();
+              } else {
+                alert('Please confirm that the payment amount is correct');
+              }
+            }}
+          >
+            Confirm Payment
+          </button>
+        </div>
+      </div>
+
+      <style>{`
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -322,8 +323,8 @@ export const OverpaymentConfirmation: React.FC<OverpaymentConfirmationProps> = (
           transform: translateY(0);
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 };
 
 export default OverpaymentConfirmation;

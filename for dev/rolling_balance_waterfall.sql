@@ -1,3 +1,74 @@
+-- ========================================================
+-- MIGRATION: ROLLING BALANCE & WATERFALL PAYMENTS
+-- ========================================================
+
+BEGIN;
+
+-- 1. Add previous_balance to franchisee_invoices
+ALTER TABLE public.franchisee_invoices 
+ADD COLUMN IF NOT EXISTS previous_balance numeric(14, 2) not null default 0;
+
+-- 2. Create function to automatically apply credits to any unpaid invoice of a branch
+CREATE OR REPLACE FUNCTION public.auto_apply_credits_to_branch_unpaid()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_people_branches_id UUID;
+    v_credit_record RECORD;
+    v_invoice_record RECORD;
+    v_amount_to_apply NUMERIC;
+BEGIN
+    -- This trigger should run on franchisee_credits after INSERT or UPDATE
+    v_people_branches_id := NEW.people_branches_id;
+
+    -- Only proceed if there is a remaining amount
+    IF NEW.remaining_amount <= 0 THEN
+        RETURN NULL;
+    END IF;
+
+    -- Find all unpaid/partial/overdue invoices for this branch (oldest first)
+    FOR v_invoice_record IN
+        SELECT id, balance
+        FROM franchisee_invoices
+        WHERE people_branches_id = v_people_branches_id
+            AND payment_status IN ('unpaid', 'partial', 'overdue')
+            AND status != 'cancelled'
+        ORDER BY invoice_date ASC, created_at ASC
+    LOOP
+        -- Calculate how much we can apply to THIS invoice
+        -- We re-fetch NEW.remaining_amount logic locally to handle multiple iterations
+        SELECT remaining_amount INTO v_amount_to_apply
+        FROM franchisee_credits
+        WHERE id = NEW.id;
+
+        IF v_amount_to_apply <= 0 THEN
+            EXIT; -- Credit exhausted
+        END IF;
+
+        v_amount_to_apply := LEAST(v_amount_to_apply, v_invoice_record.balance);
+
+        IF v_amount_to_apply > 0 THEN
+            -- Apply the credit to the invoice
+            PERFORM apply_credit_to_invoice(NEW.id, v_invoice_record.id, v_amount_to_apply);
+        END IF;
+    END LOOP;
+
+    RETURN NULL;
+END;
+$function$;
+
+-- 3. Install Trigger on franchisee_credits
+-- This ensures that whenever a credit is created (like from an overpayment on a NEW invoice),
+-- it immediately "waterfalls" to OLDER invoices.
+DROP TRIGGER IF EXISTS trg_auto_waterfall_credits ON public.franchisee_credits;
+CREATE TRIGGER trg_auto_waterfall_credits
+AFTER INSERT OR UPDATE OF remaining_amount ON public.franchisee_credits
+FOR EACH ROW
+WHEN (NEW.remaining_amount > 0)
+EXECUTE FUNCTION auto_apply_credits_to_branch_unpaid();
+
+-- 4. Update the generate_franchisee_invoice function to handle previous_balance
 CREATE OR REPLACE FUNCTION public.generate_franchisee_invoice(p_people_branches_id uuid, p_period_start date, p_period_end date, p_due_days integer DEFAULT 30, p_created_by uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -121,7 +192,8 @@ BEGIN
         discount = v_discount_total,
         tax_amount = v_tax_total,
         total_amount = v_total,
-        balance = v_total,
+        balance = v_total, -- Note: Initial balance is just the new charges. 
+                          -- The previous_balance is carried for display/collection.
         updated_at = NOW()
     WHERE id = v_invoice_id;
 
@@ -131,3 +203,5 @@ BEGIN
     RETURN v_invoice_id;
 END;
 $function$;
+
+COMMIT;

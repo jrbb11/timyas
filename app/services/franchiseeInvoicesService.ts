@@ -18,6 +18,7 @@ export interface FranchiseeInvoice {
   payment_status: 'unpaid' | 'partial' | 'paid' | 'overdue';
   paid_amount: number;
   credit_amount: number;
+  previous_balance: number;
   balance: number;
   status: 'draft' | 'sent' | 'approved' | 'cancelled';
   notes?: string;
