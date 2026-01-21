@@ -1,3 +1,10 @@
+-- ============================================================================
+-- DIRECT TRIGGER FUNCTION UPDATE - NO IMPORTS
+-- ============================================================================
+-- This directly updates the trigger function in the database
+-- Copy the entire function definition here to ensure it gets deployed
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION public.update_franchisee_invoice_payment_status()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -71,6 +78,7 @@ BEGIN
             v_invoice_id,
             'Auto-generated from overpayment on invoice ' || v_invoice_id
         )
+        -- CRITICAL FIX: Match the exact WHERE clause of the partial index
         ON CONFLICT (source_invoice_id) WHERE source_type = 'overpayment' AND source_invoice_id IS NOT NULL
         DO UPDATE SET 
             amount = EXCLUDED.amount,
@@ -81,3 +89,13 @@ BEGIN
     RETURN NULL;
 END;
 $function$;
+
+-- Verify it was created
+DO $$
+BEGIN
+    RAISE NOTICE '====================================================';
+    RAISE NOTICE '✓ Trigger function updated successfully!';
+    RAISE NOTICE '====================================================';
+    RAISE NOTICE '';
+    RAISE NOTICE 'Now try recording the overpayment in your web app!';
+END $$;

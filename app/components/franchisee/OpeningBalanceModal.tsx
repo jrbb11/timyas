@@ -38,7 +38,7 @@ export const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
 
     // Get the selected franchisee data
     const selectedFranchisee = preSelectedFranchisee ||
-        franchisees.find(f => f.id === selectedFranchiseeId);
+        franchisees.find(f => f.people_branches_id === selectedFranchiseeId);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -172,7 +172,7 @@ export const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                                 >
                                     <option value="">-- Select Franchisee --</option>
                                     {franchisees.filter(f => f.branch_id).map((f) => (
-                                        <option key={f.id} value={f.id}>
+                                        <option key={f.people_branches_id} value={f.people_branches_id}>
                                             {f.name} {f.branch_name ? `(${f.branch_name})` : ''}
                                         </option>
                                     ))}

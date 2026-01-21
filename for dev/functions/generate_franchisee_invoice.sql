@@ -30,7 +30,8 @@ BEGIN
     FROM franchisee_invoices
     WHERE people_branches_id = p_people_branches_id
         AND payment_status IN ('unpaid', 'partial', 'overdue')
-        AND status != 'cancelled';
+        AND status != 'cancelled'
+        AND balance > 0;  -- Extra safety: only include invoices with actual outstanding balance
     
     -- Create the invoice
     INSERT INTO franchisee_invoices (
