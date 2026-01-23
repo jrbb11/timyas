@@ -8,6 +8,10 @@ import { CreditHistoryModal } from '../../components/franchisee/CreditHistoryMod
 import { PaymentAdjustmentModal } from '../../components/franchisee/PaymentAdjustmentModal';
 import { OverpaymentConfirmation } from '../../components/franchisee/OverpaymentConfirmation';
 import { franchiseeCreditsService } from '../../services/franchiseeCreditsService';
+import Modal from '../../components/ui/Modal';
+import jsPDF from 'jspdf';
+// @ts-ignore
+import autoTable from 'jspdf-autotable';
 
 const FranchiseeInvoiceView = () => {
   const { id } = useParams<{ id: string }>();
@@ -48,6 +52,10 @@ const FranchiseeInvoiceView = () => {
   // Credit Application State
   const [creditApplications, setCreditApplications] = useState<any[]>([]);
   const [availableCredit, setAvailableCredit] = useState(0);
+
+  // PDF Preview State
+  const [showPDFPreview, setShowPDFPreview] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) loadInvoice();
@@ -286,6 +294,158 @@ const FranchiseeInvoiceView = () => {
     });
   };
 
+  const generatePDFDoc = (invoiceData: any) => {
+    const doc = new jsPDF();
+    const margin = 20;
+    let currentY = 20;
+
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', margin, currentY);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const statusText = `Status: ${invoiceData.status.toUpperCase()} | ${invoiceData.payment_status.toUpperCase()}`;
+    doc.text(statusText, doc.internal.pageSize.getWidth() - margin, currentY, { align: 'right' });
+
+    currentY += 10;
+    doc.setFontSize(14);
+    doc.text(invoiceData.invoice_number, margin, currentY);
+
+    currentY += 10;
+    doc.setFontSize(10);
+    doc.text(`Invoice Date: ${formatDate(invoiceData.invoice_date)}`, margin, currentY);
+    doc.text(`Due Date: ${formatDate(invoiceData.due_date)}`, margin, currentY + 5);
+
+    currentY += 20;
+
+    // Bill To & Branch information
+    const midPoint = doc.internal.pageSize.getWidth() / 2;
+
+    doc.setFont('helvetica', 'bold');
+    doc.text('Bill To:', margin, currentY);
+    doc.text('Branch:', midPoint, currentY);
+
+    currentY += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.text(invoiceData.franchisee?.name || 'N/A', margin, currentY);
+    doc.text(invoiceData.branch?.name || 'N/A', midPoint, currentY);
+
+    currentY += 5;
+    if (invoiceData.franchisee?.email) {
+      doc.text(invoiceData.franchisee.email, margin, currentY);
+    }
+    doc.text(`Code: ${invoiceData.branch?.code || 'N/A'}`, midPoint, currentY);
+
+    currentY += 15;
+    doc.text(`Billing Period: ${formatDate(invoiceData.period_start)} - ${formatDate(invoiceData.period_end)}`, margin, currentY);
+
+    currentY += 10;
+
+    // Table of items
+    autoTable(doc, {
+      startY: currentY,
+      margin: { left: margin, right: margin },
+      head: [['ID', 'Date', 'Qty', 'Unit Price', 'Shipping', 'Total']],
+      body: (invoiceData.items || []).map((item: any) => [
+        item.sale_reference,
+        formatDate(item.sale_date),
+        item.quantity,
+        formatCurrency(item.unit_price).replace('₱', 'P'),
+        item.shipping > 0 ? formatCurrency(item.shipping).replace('₱', 'P') : '-',
+        formatCurrency(item.line_total).replace('₱', 'P')
+      ]),
+      headStyles: { fillColor: [80, 80, 80] },
+      columnStyles: {
+        2: { halign: 'right' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    currentY = finalY;
+
+    // Totals
+    const rightAlignX = doc.internal.pageSize.getWidth() - margin;
+    doc.setFontSize(10);
+
+    const addTotalLine = (label: string, value: string, isBold = false) => {
+      if (isBold) doc.setFont('helvetica', 'bold');
+      else doc.setFont('helvetica', 'normal');
+      doc.text(label, rightAlignX - 45, currentY, { align: 'right' });
+      doc.text(value.replace('₱', 'P'), rightAlignX, currentY, { align: 'right' });
+      currentY += 6;
+    };
+
+    addTotalLine('Subtotal:', formatCurrency(invoiceData.subtotal));
+
+    const shippingTotal = invoiceData.items?.reduce((sum: number, item: any) => sum + parseFloat(item.shipping || 0), 0) || 0;
+    if (shippingTotal > 0) {
+      addTotalLine('Shipping Fee:', formatCurrency(shippingTotal));
+    }
+
+    if (parseFloat(invoiceData.discount) > 0) {
+      addTotalLine('Discount:', `-${formatCurrency(invoiceData.discount)}`);
+    }
+
+    addTotalLine('Tax:', formatCurrency(invoiceData.tax_amount));
+    addTotalLine('New Charges Total:', formatCurrency(invoiceData.total_amount), true);
+
+    currentY += 2;
+    addTotalLine('Current Balance:', formatCurrency(invoiceData.balance || 0));
+    if (parseFloat(invoiceData.previous_balance || '0') > 0) {
+      addTotalLine('Previous Balance:', formatCurrency(invoiceData.previous_balance));
+    }
+
+    currentY += 4;
+    doc.setFontSize(12);
+    addTotalLine('Total Amount Due:', formatCurrency(parseFloat(invoiceData.balance || '0') + parseFloat(invoiceData.previous_balance || '0')), true);
+
+    // Notes
+    if (invoiceData.notes) {
+      currentY += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Notes:', margin, currentY);
+      currentY += 5;
+      doc.setFont('helvetica', 'normal');
+      const splitNotes = doc.splitTextToSize(invoiceData.notes, doc.internal.pageSize.getWidth() - (margin * 2));
+      doc.text(splitNotes, margin, currentY);
+    }
+
+    return doc;
+  };
+
+  const handleExportPDF = () => {
+    if (!invoice) return;
+
+    try {
+      const doc = generatePDFDoc(invoice);
+      doc.save(`Invoice_${invoice.invoice_number}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF:', err);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
+  const handlePreviewPDF = () => {
+    if (!invoice) return;
+
+    try {
+      const doc = generatePDFDoc(invoice);
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      setPdfPreviewUrl(url);
+      setShowPDFPreview(true);
+    } catch (err) {
+      console.error('Error previewing PDF:', err);
+      alert('Failed to preview PDF. Please try again.');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       draft: 'bg-gray-100 text-gray-800',
@@ -357,7 +517,10 @@ const FranchiseeInvoiceView = () => {
                 Record Payment
               </button>
             )}
-            <button className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50">
+            <button
+              onClick={handlePreviewPDF}
+              className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50"
+            >
               Export PDF
             </button>
             <button
@@ -935,6 +1098,48 @@ const FranchiseeInvoiceView = () => {
             setOverpaymentData({ invoiceAmount: 0, paymentAmount: 0 });
           }}
         />
+      )}
+      {/* PDF Preview Modal */}
+      {showPDFPreview && (
+        <Modal
+          isOpen={showPDFPreview}
+          onClose={() => {
+            setShowPDFPreview(false);
+            if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+            setPdfPreviewUrl(null);
+          }}
+          title="PDF Preview"
+          footer={
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowPDFPreview(false);
+                  if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+                  setPdfPreviewUrl(null);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 font-medium"
+              >
+                Download PDF
+              </button>
+            </div>
+          }
+        >
+          {pdfPreviewUrl && (
+            <div className="w-full h-[70vh]">
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full border-none"
+                title="Invoice Preview"
+              />
+            </div>
+          )}
+        </Modal>
       )}
     </AdminLayout>
   );
