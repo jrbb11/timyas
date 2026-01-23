@@ -367,40 +367,6 @@ const FranchiseeInvoiceView = () => {
 
     currentY = (doc as any).lastAutoTable.finalY + 15;
 
-    // Payments & Credits Table
-    const combinedHistory = [
-      ...(invoiceData.payments || []).map((p: any) => ({ ...p, type: 'payment', sortDate: p.payment_date })),
-      ...(creditApps || []).map((c: any) => ({ ...c, type: 'credit', sortDate: c.applied_at }))
-    ].sort((a: any, b: any) => new Date(a.sortDate).getTime() - new Date(b.sortDate).getTime());
-
-    if (combinedHistory.length > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.text('Payments & Credits History', margin, currentY);
-      currentY += 5;
-
-      autoTable(doc, {
-        startY: currentY,
-        margin: { left: margin, right: margin },
-        head: [['Date', 'Type/Method', 'Reference/Notes', 'Amount']],
-        body: combinedHistory.map((item: any) => [
-          formatDate(item.sortDate),
-          item.type === 'payment' ? (item.payment_method?.name || 'Payment') : 'Store Credit',
-          item.type === 'payment' ? (item.reference_number || item.notes || '-') : `From: ${item.credit?.source_type || 'Credit'}`,
-          item.type === 'payment'
-            ? formatCurrency(item.amount).replace('₱', 'P')
-            : formatCurrency(item.amount_applied).replace('₱', 'P')
-        ]),
-        headStyles: { fillColor: [100, 100, 100] },
-        columnStyles: {
-          3: { halign: 'right' },
-        }
-      });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
-    } else {
-      currentY += 5;
-    }
-
     // Totals
     const rightAlignX = doc.internal.pageSize.getWidth() - margin;
     doc.setFontSize(10);
@@ -457,6 +423,46 @@ const FranchiseeInvoiceView = () => {
       doc.setFont('helvetica', 'normal');
       const splitNotes = doc.splitTextToSize(invoiceData.notes, doc.internal.pageSize.getWidth() - (margin * 2));
       doc.text(splitNotes, margin, currentY);
+    }
+
+    // Payments & Credits Table on NEXT PAGE
+    const combinedHistory = [
+      ...(invoiceData.payments || []).map((p: any) => ({ ...p, type: 'payment', sortDate: p.payment_date })),
+      ...(creditApps || []).map((c: any) => ({ ...c, type: 'credit', sortDate: c.applied_at }))
+    ].sort((a: any, b: any) => new Date(a.sortDate).getTime() - new Date(b.sortDate).getTime());
+
+    if (combinedHistory.length > 0) {
+      doc.addPage();
+      currentY = 20;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('Payments & Credits History', margin, currentY);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      currentY += 10;
+      doc.text(`Invoice: ${invoiceData.invoice_number}`, margin, currentY);
+      currentY += 10;
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        head: [['Date', 'Type/Method', 'Reference/Notes', 'Amount']],
+        body: combinedHistory.map((item: any) => [
+          formatDate(item.sortDate),
+          item.type === 'payment' ? (item.payment_method?.name || 'Payment') : 'Store Credit',
+          item.type === 'payment' ? (item.reference_number || item.notes || '-') : `From: ${item.credit?.source_type || 'Credit'}`,
+          item.type === 'payment'
+            ? formatCurrency(item.amount).replace('₱', 'P')
+            : formatCurrency(item.amount_applied).replace('₱', 'P')
+        ]),
+        headStyles: { fillColor: [100, 100, 100] },
+        styles: { fontSize: 9 }, // Slightly smaller font as requested (notation-like)
+        columnStyles: {
+          3: { halign: 'right' },
+        }
+      });
     }
 
     return doc;
