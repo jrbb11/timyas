@@ -294,7 +294,7 @@ const FranchiseeInvoiceView = () => {
     });
   };
 
-  const generatePDFDoc = (invoiceData: any) => {
+  const generatePDFDoc = (invoiceData: any, creditApps: any[] = []) => {
     const doc = new jsPDF();
     const margin = 20;
     let currentY = 20;
@@ -347,7 +347,7 @@ const FranchiseeInvoiceView = () => {
     autoTable(doc, {
       startY: currentY,
       margin: { left: margin, right: margin },
-      head: [['ID', 'Date', 'Qty', 'Unit Price', 'Shipping', 'Total']],
+      head: [['Ref #', 'Date', 'Qty', 'Unit Price', 'Shipping', 'Total']],
       body: (invoiceData.items || []).map((item: any) => [
         item.sale_reference,
         formatDate(item.sale_date),
@@ -365,19 +365,54 @@ const FranchiseeInvoiceView = () => {
       }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    currentY = finalY;
+    currentY = (doc as any).lastAutoTable.finalY + 15;
+
+    // Payments & Credits Table
+    const combinedHistory = [
+      ...(invoiceData.payments || []).map((p: any) => ({ ...p, type: 'payment', sortDate: p.payment_date })),
+      ...(creditApps || []).map((c: any) => ({ ...c, type: 'credit', sortDate: c.applied_at }))
+    ].sort((a: any, b: any) => new Date(a.sortDate).getTime() - new Date(b.sortDate).getTime());
+
+    if (combinedHistory.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Payments & Credits History', margin, currentY);
+      currentY += 5;
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: margin, right: margin },
+        head: [['Date', 'Type/Method', 'Reference/Notes', 'Amount']],
+        body: combinedHistory.map((item: any) => [
+          formatDate(item.sortDate),
+          item.type === 'payment' ? (item.payment_method?.name || 'Payment') : 'Store Credit',
+          item.type === 'payment' ? (item.reference_number || item.notes || '-') : `From: ${item.credit?.source_type || 'Credit'}`,
+          item.type === 'payment'
+            ? formatCurrency(item.amount).replace('₱', 'P')
+            : formatCurrency(item.amount_applied).replace('₱', 'P')
+        ]),
+        headStyles: { fillColor: [100, 100, 100] },
+        columnStyles: {
+          3: { halign: 'right' },
+        }
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 10;
+    } else {
+      currentY += 5;
+    }
 
     // Totals
     const rightAlignX = doc.internal.pageSize.getWidth() - margin;
     doc.setFontSize(10);
 
-    const addTotalLine = (label: string, value: string, isBold = false) => {
+    const addTotalLine = (label: string, value: string, isBold = false, color: [number, number, number] = [0, 0, 0]) => {
       if (isBold) doc.setFont('helvetica', 'bold');
       else doc.setFont('helvetica', 'normal');
-      doc.text(label, rightAlignX - 45, currentY, { align: 'right' });
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(label, rightAlignX - 60, currentY, { align: 'right' });
       doc.text(value.replace('₱', 'P'), rightAlignX, currentY, { align: 'right' });
       currentY += 6;
+      doc.setTextColor(0, 0, 0); // Reset color
     };
 
     addTotalLine('Subtotal:', formatCurrency(invoiceData.subtotal));
@@ -395,14 +430,22 @@ const FranchiseeInvoiceView = () => {
     addTotalLine('New Charges Total:', formatCurrency(invoiceData.total_amount), true);
 
     currentY += 2;
-    addTotalLine('Current Balance:', formatCurrency(invoiceData.balance || 0));
+    addTotalLine('Paid (Cash/Cheque):', formatCurrency(invoiceData.paid_amount || 0), false, [22, 101, 52]); // text-green-800
+
+    if (parseFloat(invoiceData.credit_amount || '0') > 0) {
+      addTotalLine('Used Store Credit:', formatCurrency(invoiceData.credit_amount), false, [107, 33, 168]); // text-purple-800
+    }
+
+    currentY += 2;
+    addTotalLine('Current Invoice Balance:', formatCurrency(invoiceData.balance || 0), true);
+
     if (parseFloat(invoiceData.previous_balance || '0') > 0) {
-      addTotalLine('Previous Balance:', formatCurrency(invoiceData.previous_balance));
+      addTotalLine('Previous Balance (Arrears):', formatCurrency(invoiceData.previous_balance), false, [153, 27, 27]); // text-red-800
     }
 
     currentY += 4;
     doc.setFontSize(12);
-    addTotalLine('Total Amount Due:', formatCurrency(parseFloat(invoiceData.balance || '0') + parseFloat(invoiceData.previous_balance || '0')), true);
+    addTotalLine('TOTAL AMOUNT DUE:', formatCurrency(parseFloat(invoiceData.balance || '0') + parseFloat(invoiceData.previous_balance || '0')), true, [234, 88, 12]); // text-orange-600
 
     // Notes
     if (invoiceData.notes) {
@@ -423,7 +466,7 @@ const FranchiseeInvoiceView = () => {
     if (!invoice) return;
 
     try {
-      const doc = generatePDFDoc(invoice);
+      const doc = generatePDFDoc(invoice, creditApplications);
       doc.save(`Invoice_${invoice.invoice_number}.pdf`);
     } catch (err) {
       console.error('Error generating PDF:', err);
@@ -435,7 +478,7 @@ const FranchiseeInvoiceView = () => {
     if (!invoice) return;
 
     try {
-      const doc = generatePDFDoc(invoice);
+      const doc = generatePDFDoc(invoice, creditApplications);
       const blob = doc.output('blob');
       const url = URL.createObjectURL(blob);
       setPdfPreviewUrl(url);
