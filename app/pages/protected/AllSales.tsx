@@ -28,8 +28,10 @@ const AllSales = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(0);
+  const [totalRows, setTotalRows] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [saleToDelete, setSaleToDelete] = useState<any | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
@@ -37,7 +39,7 @@ const AllSales = () => {
   const [viewSale, setViewSale] = useState<any | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentSale, setPaymentSale] = useState<any | null>(null);
-  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method_id: '', account_id: '', payment_date: new Date().toISOString().slice(0,10), reference_number: '', note: '' });
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method_id: '', account_id: '', payment_date: new Date().toISOString().slice(0, 10), reference_number: '', note: '' });
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -50,19 +52,41 @@ const AllSales = () => {
   const navigate = useNavigate();
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
 
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(0); // Reset to first page on new search
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [search]);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
-    salesService.getView().then(({ data, error }) => {
+
+    const startDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : null;
+    const endDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : null;
+
+    salesService.getView({
+      page: currentPage,
+      pageSize: rowsPerPage,
+      search: debouncedSearch,
+      startDate,
+      endDate,
+      sortKey: sortConfig.key,
+      sortDirection: sortConfig.direction
+    }).then(({ data, error, count }) => {
       if (error) {
         setError(error.message);
         setLoading(false);
         return;
       }
       setSales(data || []);
+      setTotalRows(count || 0);
       setLoading(false);
     });
-  }, []);
+  }, [currentPage, rowsPerPage, debouncedSearch, dateRange, sortConfig]);
 
   useEffect(() => {
     accountsService.getAll().then(({ data }) => setAccounts(data || []));
@@ -113,50 +137,78 @@ const AllSales = () => {
     return 0;
   });
 
-  const filteredSales = sortedSales.filter((sale) => {
-    const searchTerm = search.toLowerCase();
-    const matchesSearch =
-      sale.reference?.toLowerCase().includes(searchTerm) ||
-      sale.invoice_number?.toLowerCase().includes(searchTerm) ||
-      sale.customer?.toLowerCase().includes(searchTerm) ||
-      sale.warehouse_name?.toLowerCase().includes(searchTerm);
-    let matchesDate = true;
-    if (dateRange[0].startDate && dateRange[0].endDate) {
-      const saleDate = new Date(sale.date);
-      matchesDate =
-        saleDate >= dateRange[0].startDate &&
-        saleDate <= dateRange[0].endDate;
-    }
-    return matchesSearch && matchesDate;
-  });
-
-  // Pagination logic
-  const paginatedSales = filteredSales.slice(
-    currentPage * rowsPerPage,
-    currentPage * rowsPerPage + rowsPerPage
-  );
-  const totalRows = filteredSales.length;
   const startRow = totalRows === 0 ? 0 : currentPage * rowsPerPage + 1;
   const endRow = Math.min((currentPage + 1) * rowsPerPage, totalRows);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
+    setLoadingAction(true);
+    const startDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : null;
+    const endDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : null;
+
+    const { data: allFilteredSales } = await salesService.getView({
+      page: 0,
+      pageSize: totalRows, // Fetch everything for export
+      search: debouncedSearch,
+      startDate,
+      endDate,
+      sortKey: sortConfig.key,
+      sortDirection: sortConfig.direction
+    });
+
+    setLoadingAction(false);
+    if (!allFilteredSales) return;
+
     const doc = new jsPDF();
     autoTable(doc, {
       head: [["ID", "Reference", "Invoice", "Date", "Customer", "Warehouse", "Status", "Payment Status", "Grand Total", "Shipping Fee", "Total", "Created At"]],
-      body: filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => [id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, Number(total_amount - (shipping || 0)).toLocaleString(), Number(shipping || 0).toLocaleString(), Number(total_amount).toLocaleString(), created_at]),
+      body: allFilteredSales.map((sale: any) => [sale.id, sale.reference, sale.invoice_number, sale.date, sale.customer, sale.warehouse_name, sale.status, sale.payment_status, Number(sale.total_amount - (sale.shipping || 0)).toLocaleString(), Number(sale.shipping || 0).toLocaleString(), Number(sale.total_amount).toLocaleString(), sale.created_at]),
     });
     doc.save('sales.pdf');
   };
 
-  const handleExportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
+  const handleExportExcel = async () => {
+    setLoadingAction(true);
+    const startDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : null;
+    const endDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : null;
+
+    const { data: allFilteredSales } = await salesService.getView({
+      page: 0,
+      pageSize: totalRows,
+      search: debouncedSearch,
+      startDate,
+      endDate,
+      sortKey: sortConfig.key,
+      sortDirection: sortConfig.direction
+    });
+
+    setLoadingAction(false);
+    if (!allFilteredSales) return;
+
+    const ws = XLSX.utils.json_to_sheet(allFilteredSales.map((sale: any) => ({ id: sale.id, reference: sale.reference, invoice_number: sale.invoice_number, date: sale.date, customer: sale.customer, warehouse_name: sale.warehouse_name, status: sale.status, payment_status: sale.payment_status, grand_total: Number(sale.total_amount - (sale.shipping || 0)), shipping_fee: Number(sale.shipping || 0), total: Number(sale.total_amount), created_at: sale.created_at })));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sales');
     XLSX.writeFile(wb, 'sales.xlsx');
   };
 
-  const handleExportCSV = () => {
-    const csv = Papa.unparse(filteredSales.map(({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, total_amount, shipping, created_at }) => ({ id, reference, invoice_number, date, customer, warehouse_name, status, payment_status, grand_total: Number(total_amount - (shipping || 0)), shipping_fee: Number(shipping || 0), total: Number(total_amount), created_at })));
+  const handleExportCSV = async () => {
+    setLoadingAction(true);
+    const startDate = dateRange[0].startDate ? format(dateRange[0].startDate, 'yyyy-MM-dd') : null;
+    const endDate = dateRange[0].endDate ? format(dateRange[0].endDate, 'yyyy-MM-dd') : null;
+
+    const { data: allFilteredSales } = await salesService.getView({
+      page: 0,
+      pageSize: totalRows,
+      search: debouncedSearch,
+      startDate,
+      endDate,
+      sortKey: sortConfig.key,
+      sortDirection: sortConfig.direction
+    });
+
+    setLoadingAction(false);
+    if (!allFilteredSales) return;
+
+    const csv = Papa.unparse(allFilteredSales.map((sale: any) => ({ id: sale.id, reference: sale.reference, invoice_number: sale.invoice_number, date: sale.date, customer: sale.customer, warehouse_name: sale.warehouse_name, status: sale.status, payment_status: sale.payment_status, grand_total: Number(sale.total_amount - (sale.shipping || 0)), shipping_fee: Number(sale.shipping || 0), total: Number(sale.total_amount), created_at: sale.created_at })));
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -213,7 +265,7 @@ const AllSales = () => {
       amount: sale.due || sale.total_amount,
       payment_method_id: paymentMethods[0]?.id || '',
       account_id: accounts[0]?.id || '',
-      payment_date: new Date().toISOString().slice(0,10),
+      payment_date: new Date().toISOString().slice(0, 10),
       reference_number: '',
       note: ''
     });
@@ -251,7 +303,7 @@ const AllSales = () => {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelected(paginatedSales.map(s => s.id));
+      setSelected(sales.map(s => s.id));
     } else {
       setSelected([]);
     }
@@ -329,7 +381,7 @@ const AllSales = () => {
               resource="sales"
               action="create"
               className="bg-black text-white px-5 py-2 rounded-lg font-semibold shadow hover:bg-gray-900 transition ml-auto"
-              style={{minWidth: 120}}
+              style={{ minWidth: 120 }}
               onClick={() => navigate('/sales/create')}
             >
               + Create
@@ -345,7 +397,7 @@ const AllSales = () => {
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b text-gray-700 text-base">
-                  <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === paginatedSales.length && paginatedSales.length > 0} onChange={handleSelectAll} /></th>
+                  <th className="p-4 text-left font-semibold"><input type="checkbox" checked={selected.length === sales.length && sales.length > 0} onChange={handleSelectAll} /></th>
                   <th className="p-4 text-left font-semibold cursor-pointer select-none" onClick={() => handleSort('date')}>
                     Date {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                   </th>
@@ -366,7 +418,7 @@ const AllSales = () => {
                 </tr>
               </thead>
               <tbody>
-                {paginatedSales.map((sale) => (
+                {sales.map((sale) => (
                   <tr key={sale.id} className={`border-b hover:bg-gray-50 transition ${selected.includes(sale.id) ? 'bg-blue-50' : ''}`}>
                     <td className="p-4"><input type="checkbox" checked={selected.includes(sale.id)} onChange={() => handleSelectRow(sale.id)} /></td>
                     <td className="p-4 font-medium">{sale.date}</td>

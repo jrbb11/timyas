@@ -51,8 +51,50 @@ export const salesService = {
       return supabase.from('sales').delete().eq('id', id);
     }
   },
-  async getView() {
-    return supabase.from('sales_view').select('*', { count: 'exact' }).order('date', { ascending: false }).limit(10000);
+  async getView(options: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    sortKey?: string;
+    sortDirection?: 'asc' | 'desc';
+  } = {}) {
+    const {
+      page = 0,
+      pageSize = 10,
+      search = '',
+      startDate = null,
+      endDate = null,
+      sortKey = 'date',
+      sortDirection = 'desc'
+    } = options;
+
+    let query = supabase.from('sales_view').select('*', { count: 'exact' });
+
+    // Filtering
+    if (search) {
+      // Searching across multiple columns
+      query = query.or(`reference.ilike.%${search}%,invoice_number.ilike.%${search}%,customer.ilike.%${search}%,warehouse_name.ilike.%${search}%`);
+    }
+
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+
+    if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
+    // Sorting
+    query = query.order(sortKey, { ascending: sortDirection === 'asc' });
+
+    // Pagination
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+
+    return query;
   },
   async getByInvoiceNumber(invoice_number: string) {
     return supabase.from('sales').select('*').eq('invoice_number', invoice_number);
@@ -85,7 +127,7 @@ export const salesService = {
       p_limit: 100,
       p_offset: 0
     });
-    
+
     console.log('RPC query result:', result); // Debug log
     return result;
   },
@@ -117,20 +159,20 @@ export async function getSalesByCustomer(): Promise<SalesByCustomer[]> {
     const totalAmount = Number(row.total_amount) || 0;
     const shipping = Number(row.shipping) || 0;
     const paid = Number(row.paid) || 0;
-    
+
     // Calculate sales excluding shipping
     const salesAmount = totalAmount - shipping;
-    
+
     // Adjust paid to exclude shipping proportionally
     let adjustedPaid = 0;
     if (totalAmount > 0) {
       const paidRatio = paid / totalAmount;
       adjustedPaid = salesAmount * paidRatio;
     }
-    
+
     // Due is the remaining amount
     const adjustedDue = salesAmount - adjustedPaid;
-    
+
     grouped[row.customer].total_sales += salesAmount;
     grouped[row.customer].total_paid += adjustedPaid;
     grouped[row.customer].total_due += adjustedDue;
