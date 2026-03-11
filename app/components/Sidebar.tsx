@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  FaChartBar, FaShoppingCart, FaUsers, FaCog, FaTags, FaMoneyBill, FaFileInvoice, FaSun, FaMoon, FaSignOutAlt, FaCreditCard, FaPlus, FaList, FaPrint, FaThList, FaTrademark, FaBalanceScale, FaFile, FaExchangeAlt, FaHistory, FaQuestionCircle, FaShieldAlt
+  FaChartBar, FaShoppingCart, FaUsers, FaCog, FaTags, FaMoneyBill, FaFileInvoice, FaSun, FaMoon, FaSignOutAlt, FaCreditCard, FaPlus, FaList, FaPrint, FaThList, FaTrademark, FaBalanceScale, FaFile, FaExchangeAlt, FaHistory, FaQuestionCircle, FaShieldAlt, FaMapMarkerAlt
 } from 'react-icons/fa';
 import { supabase } from '../utils/supabaseClient';
 import { useRBAC } from '../services/rbacService';
@@ -72,6 +72,7 @@ const menu = [
     section: 'SETTINGS',
     items: [
       { label: 'Payment Methods', icon: <FaFileInvoice />, path: '/payment-methods', permission: { resource: 'system', action: 'manage' } },
+      { label: 'Branch Management', icon: <FaMapMarkerAlt />, path: '/settings/branches', permission: { resource: 'system', action: 'manage' } },
       { label: 'Deposit Categories', icon: <FaList />, path: '/deposit-categories', permission: { resource: 'system', action: 'manage' } },
       { label: 'Expense Categories', icon: <FaList />, path: '/expense-categories', permission: { resource: 'system', action: 'manage' } },
       { label: 'Taxes', icon: <FaFileInvoice />, path: '/taxes', permission: { resource: 'system', action: 'manage' } },

@@ -10,4 +10,10 @@ export const branchesService = {
   async getById(id: string) {
     return supabase.from('branches').select('*').eq('id', id).single();
   },
-}; 
+  async update(id: string, data: any) {
+    return supabase.from('branches').update(data).eq('id', id).select();
+  },
+  async remove(id: string) {
+    return supabase.from('branches').delete().eq('id', id);
+  },
+};

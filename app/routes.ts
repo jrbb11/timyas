@@ -35,6 +35,7 @@ export default [
   route("expense-categories", "pages/protected/ExpenseCategories.tsx"),
   route("taxes", "pages/protected/Taxes.tsx"),
   route("reports", "pages/protected/Reports.tsx"),
+  route("settings/branches", "pages/protected/Branches.tsx"),
   route("settings/people-branches", "pages/protected/PeopleBranchAssignment.tsx"),
   route("franchisee/create", "pages/protected/FranchiseeCreate.tsx"),
   route("franchisee-invoices", "pages/protected/FranchiseeInvoicesList.tsx"),
