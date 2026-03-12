@@ -5,10 +5,13 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
 } from "react-router";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { checkSubscriptionStatus } from "./services/klyraService";
+import SubscriptionBlocked from "./components/SubscriptionBlocked";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -57,6 +60,11 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+export async function loader() {
+  const subscription = await checkSubscriptionStatus();
+  return { subscription };
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -76,6 +84,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  const { subscription } = useLoaderData<typeof loader>();
+
+  if (subscription.isExpired) {
+    return <SubscriptionBlocked />;
+  }
+
   return <Outlet />;
 }
 
