@@ -67,6 +67,7 @@ export interface GenerateInvoiceParams {
   due_days?: number;
   created_by?: string;
   notes?: string;
+  invoice_date?: string;
 }
 
 export interface InvoiceSummary {
@@ -180,7 +181,8 @@ export const franchiseeInvoicesService = {
       p_period_end: params.period_end,
       p_due_days: params.due_days || 30,
       p_created_by: params.created_by || null,
-      p_notes: params.notes || null
+      p_notes: params.notes || null,
+      p_invoice_date: params.invoice_date || null
     });
 
     return { data, error };

@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION public.generate_franchisee_invoice(p_people_branches_id uuid, p_period_start date, p_period_end date, p_due_days integer DEFAULT 30, p_created_by uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text)
+CREATE OR REPLACE FUNCTION public.generate_franchisee_invoice(p_people_branches_id uuid, p_period_start date, p_period_end date, p_due_days integer DEFAULT 30, p_created_by uuid DEFAULT NULL::uuid, p_notes text DEFAULT NULL::text, p_invoice_date date DEFAULT CURRENT_DATE)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -50,10 +50,10 @@ BEGIN
         p_people_branches_id,
         v_branch_id,
         v_franchisee_id,
-        CURRENT_DATE,
+        COALESCE(p_invoice_date, CURRENT_DATE),
         p_period_start,
         p_period_end,
-        CURRENT_DATE + p_due_days,
+        COALESCE(p_invoice_date, CURRENT_DATE) + p_due_days,
         v_previous_balance,
         p_created_by,
         p_notes,

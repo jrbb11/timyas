@@ -20,6 +20,7 @@ const FranchiseeInvoiceGenerate = () => {
 
   const [franchisees, setFranchisees] = useState<FranchiseeOption[]>([]);
   const [selectedPeopleBranches, setSelectedPeopleBranches] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
   const [dueDays, setDueDays] = useState(30);
@@ -126,7 +127,8 @@ const FranchiseeInvoiceGenerate = () => {
         period_end: periodEnd,
         due_days: dueDays,
         created_by: appUserId,
-        notes: notes || undefined
+        notes: notes || undefined,
+        invoice_date: invoiceDate
       });
 
       if (genError) throw genError;
@@ -198,6 +200,23 @@ const FranchiseeInvoiceGenerate = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Invoice Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Invoice Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={invoiceDate}
+                onChange={(e) => {
+                  setInvoiceDate(e.target.value);
+                  setShowPreview(false);
+                }}
+                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-black"
+                required
+              />
             </div>
 
             {/* Date Range */}
