@@ -4,9 +4,6 @@ const klyraUrl = import.meta.env.VITE_KLYRA_URL as string;
 const klyraAnonKey = import.meta.env.VITE_KLYRA_ANON_KEY as string;
 const klyraClientId = import.meta.env.VITE_KLYRA_CLIENT_ID as string;
 
-// Initialize a separate Supabase client for Klyra
-const klyra = createClient(klyraUrl, klyraAnonKey);
-
 export interface SubscriptionStatus {
   isExpired: boolean;
   expiryDate: string | null;
@@ -19,6 +16,8 @@ export async function checkSubscriptionStatus(): Promise<SubscriptionStatus> {
       console.warn('Klyra configuration missing, skipping subscription check.');
       return { isExpired: false, expiryDate: null, serviceName: null };
     }
+
+    const klyra = createClient(klyraUrl, klyraAnonKey);
 
     const { data, error } = await klyra
       .from('services')

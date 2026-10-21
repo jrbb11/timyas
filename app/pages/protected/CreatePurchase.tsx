@@ -9,6 +9,7 @@ import Modal from '../../components/ui/Modal';
 import { purchasesService } from '../../services/purchasesService';
 import { getCurrentUser } from '../../utils/supabaseClient';
 import { purchaseItemsService } from '../../services/purchaseItemsService';
+import { toast } from 'react-hot-toast';
 
 const CreatePurchase = () => {
   const { id } = useParams();
@@ -47,6 +48,41 @@ const CreatePurchase = () => {
   // Add state for selected supplier and warehouse
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedWarehouse, setSelectedWarehouse] = useState('');
+
+  // Quick Add Supplier state
+  const [showQuickSupplierModal, setShowQuickSupplierModal] = useState(false);
+  const [quickSupplierName, setQuickSupplierName] = useState('');
+  const [quickSupplierCompany, setQuickSupplierCompany] = useState('');
+  const [quickSupplierPhone, setQuickSupplierPhone] = useState('');
+  const [quickSupplierCity, setQuickSupplierCity] = useState('');
+  const [quickSupplierLoading, setQuickSupplierLoading] = useState(false);
+
+  const handleQuickSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickSupplierName.trim()) return;
+    setQuickSupplierLoading(true);
+    try {
+      const { data, error } = await suppliersService.create({
+        name: quickSupplierName,
+        company: quickSupplierCompany || null,
+        phone: quickSupplierPhone || null,
+        city: quickSupplierCity || null,
+      });
+      if (error) throw error;
+      setSuppliers(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedSupplier(data.id);
+      setShowQuickSupplierModal(false);
+      setQuickSupplierName('');
+      setQuickSupplierCompany('');
+      setQuickSupplierPhone('');
+      setQuickSupplierCity('');
+      toast.success(`Supplier "${data.name}" added and selected!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to add supplier');
+    } finally {
+      setQuickSupplierLoading(false);
+    }
+  };
 
   // Add state for status
   const [status, setStatus] = useState('received');
@@ -316,9 +352,18 @@ const CreatePurchase = () => {
               <input type="date" className="w-full border rounded px-3 py-2" value={date} onChange={e => setDate(e.target.value)} required />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Supplier *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Supplier *</label>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickSupplierModal(true)}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                >
+                  <FaPlus size={10} /> Add Supplier
+                </button>
+              </div>
               <select
-                className="w-full border rounded px-3 py-2"
+                className="w-full border rounded px-3 py-2 text-gray-900 bg-white"
                 required
                 disabled={loadingSuppliers}
                 value={selectedSupplier}
@@ -571,6 +616,79 @@ const CreatePurchase = () => {
           </div>
           <div className="md:col-span-2 flex justify-end mt-4">
             <button type="submit" className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">Submit</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Quick Add Supplier Modal */}
+      <Modal
+        isOpen={showQuickSupplierModal}
+        onClose={() => setShowQuickSupplierModal(false)}
+        title="Add New Supplier"
+      >
+        <form onSubmit={handleQuickSupplierSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Supplier Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Benben Dressed Chicken"
+              value={quickSupplierName}
+              onChange={(e) => setQuickSupplierName(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Benben Poultry & Meat Corp"
+              value={quickSupplierCompany}
+              onChange={(e) => setQuickSupplierCompany(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input
+                type="text"
+                placeholder="0917-000-0000"
+                value={quickSupplierPhone}
+                onChange={(e) => setQuickSupplierPhone(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input
+                type="text"
+                placeholder="City"
+                value={quickSupplierCity}
+                onChange={(e) => setQuickSupplierCity(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setShowQuickSupplierModal(false)}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={quickSupplierLoading}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+            >
+              {quickSupplierLoading ? 'Saving...' : 'Save & Select'}
+            </button>
           </div>
         </form>
       </Modal>

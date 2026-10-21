@@ -44,6 +44,7 @@ const menu = [
         children: [
           { label: 'Create Purchase', path: '/purchases/create', permission: { resource: 'purchases', action: 'create' } },
           { label: 'All Purchases', path: '/purchases/all', permission: { resource: 'purchases', action: 'read' } },
+          { label: 'Suppliers', path: '/suppliers', permission: { resource: 'purchases', action: 'read' } },
         ]
       },
       { label: 'Discounts', icon: <FaTags />, path: '#', permission: { resource: 'sales', action: 'read' } },

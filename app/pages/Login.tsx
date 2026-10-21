@@ -89,38 +89,38 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto space-y-6">
             <h2 className="text-2xl font-bold mb-2 text-gray-900">Login to <span className="text-blue-700">Timyas Lechon Manok</span></h2>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="block text-sm font-medium mb-1 text-gray-700">Email</label>
               <input
                 type="email"
                 placeholder="Enter your email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300"
+                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
+              <label className="block text-sm font-medium mb-1 text-gray-700">Password</label>
               <input
                 type="password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300"
+                className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none"
               />
             </div>
             <div className="flex items-center justify-between mb-2">
-              <label className="flex items-center text-sm">
+              <label className="flex items-center text-sm text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={remember}
                   onChange={e => setRemember(e.target.checked)}
-                  className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 Remember me
               </label>
-              <a href="#" className="text-blue-700 text-sm underline">Forgot Password?</a>
+              <a href="#" className="text-blue-700 text-sm hover:underline">Forgot Password?</a>
             </div>
             <button
               type="submit"

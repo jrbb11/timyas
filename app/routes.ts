@@ -24,6 +24,7 @@ export default [
   route("purchases/all", "pages/protected/AllPurchases.tsx"),
   route("purchases/edit/:id", "pages/protected/EditPurchase.tsx"),
   route("purchases/view/:id", "pages/protected/PurchaseView.tsx"),
+  route("suppliers", "pages/protected/Suppliers.tsx"),
   route("customers", "pages/protected/Customers.tsx"),
   route("accounts", "pages/protected/Accounts.tsx"),
   route("deposits", "pages/protected/Deposits.tsx"),

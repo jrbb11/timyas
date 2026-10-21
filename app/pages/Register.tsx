@@ -115,29 +115,29 @@ export default function Register() {
             <h2 className="text-2xl font-bold mb-2 text-gray-900">Sign up as <span className="text-blue-700">Timyas Lechon Manok</span></h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
-                <input name="first_name" placeholder="Enter your first name" value={form.first_name} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300" />
+                <label className="block text-sm font-medium mb-1 text-gray-700">First Name</label>
+                <input name="first_name" placeholder="Enter your first name" value={form.first_name} onChange={handleChange} className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
-                <input name="last_name" placeholder="Enter your last name" value={form.last_name} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300" />
+                <label className="block text-sm font-medium mb-1 text-gray-700">Last Name</label>
+                <input name="last_name" placeholder="Enter your last name" value={form.last_name} onChange={handleChange} className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
-              <input name="email" type="email" placeholder="Enter your email" value={form.email} onChange={handleChange} required className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300" />
+              <label className="block text-sm font-medium mb-1 text-gray-700">Email</label>
+              <input name="email" type="email" placeholder="Enter your email" value={form.email} onChange={handleChange} required className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Password</label>
-              <input name="password" type="password" placeholder="Enter your password" value={form.password} onChange={handleChange} required className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300" />
+              <label className="block text-sm font-medium mb-1 text-gray-700">Password</label>
+              <input name="password" type="password" placeholder="Enter your password" value={form.password} onChange={handleChange} required className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Contact Number</label>
-              <input name="contact_number" placeholder="Enter your contact number" value={form.contact_number} onChange={handleChange} className="w-full border border-gray-300 p-2 rounded focus:ring-2 focus:ring-blue-300" />
+              <label className="block text-sm font-medium mb-1 text-gray-700">Contact Number</label>
+              <input name="contact_number" placeholder="Enter your contact number" value={form.contact_number} onChange={handleChange} className="w-full border border-gray-300 p-2.5 rounded-lg text-gray-900 bg-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
             </div>
             <div className="flex items-center gap-2">
-              <input id="terms" type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
-              <label htmlFor="terms" className="text-sm text-gray-700">I agree with all <a href="#" className="text-blue-700 underline">Terms and Conditions</a> and <a href="#" className="text-blue-700 underline">Privacy Policy</a>.</label>
+              <input id="terms" type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" />
+              <label htmlFor="terms" className="text-sm text-gray-700 cursor-pointer">I agree with all <a href="#" className="text-blue-700 underline">Terms and Conditions</a> and <a href="#" className="text-blue-700 underline">Privacy Policy</a>.</label>
             </div>
             <button type="submit" disabled={loading || !agreed} className="w-full bg-blue-700 text-white py-2 rounded font-semibold hover:bg-blue-800 transition">
               {loading ? 'Registering...' : 'Sign Up'}
